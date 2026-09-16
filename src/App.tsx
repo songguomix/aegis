@@ -138,27 +138,27 @@ export default function App() {
             </div>
 
             <div className="stats">
-              <div className="glass stat-card">
+              <div className="stat-card">
                 <div className="label">{L("total")}</div>
                 <div className="value">{stats?.total ?? 0}</div>
                 <div className="hint">VT cache {health?.vtCache ?? 0}</div>
               </div>
-              <div className="glass stat-card allow">
+              <div className="stat-card allow">
                 <div className="label">{L("allow")}</div>
                 <div className="value">{stats?.allow ?? 0}</div>
               </div>
-              <div className="glass stat-card review">
+              <div className="stat-card review">
                 <div className="label">{L("review")}</div>
                 <div className="value">{stats?.review ?? 0}</div>
               </div>
-              <div className="glass stat-card block">
+              <div className="stat-card block">
                 <div className="label">{L("block")}</div>
                 <div className="value">{stats?.block ?? 0}</div>
               </div>
             </div>
 
             <div className="grid-2">
-              <section className="glass panel">
+              <section className="panel">
                 <div className="panel-head">
                   <h3>{L("recent")}</h3>
                 </div>
@@ -171,7 +171,7 @@ export default function App() {
                         <tr>
                           <th>{L("decision")}</th>
                           <th>{L("url")}</th>
-                          <th>{L("score")}</th>
+                          <th style={{ textAlign: "right" }}>{L("score")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -181,7 +181,9 @@ export default function App() {
                               <DecisionPill decision={item.decision} />
                             </td>
                             <td className="mono">{item.hostname || item.url}</td>
-                            <td>{item.score}</td>
+                            <td>
+                              <div className="score">{item.score}</div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -190,7 +192,7 @@ export default function App() {
                 )}
               </section>
 
-              <section className="glass panel">
+              <section className="panel">
                 <div className="panel-head">
                   <h3>{L("checkTitle")}</h3>
                 </div>
@@ -209,31 +211,31 @@ export default function App() {
                   </button>
                 </div>
                 {result ? (
-                  <div className="glass-soft result-card" style={{ marginTop: 16 }}>
+                  <div className="result" style={{ marginTop: 14 }}>
                     <div className="result-head" style={{ marginBottom: 12, paddingBottom: 12 }}>
-                      <div className="url mono">{result.hostname}</div>
+                      <div>
+                        <div className="url mono">{result.hostname}</div>
+                      </div>
                       <div className="split">
-                        <div className="score-ring">{result.score}</div>
+                        <span className="score">{result.score}</span>
                         <DecisionPill decision={result.decision} />
                       </div>
                     </div>
                     <div className="meta-grid cols-2">
-                      <div className="glass-soft meta-item">
+                      <div className="meta-item">
                         <div className="k">{L("official")}</div>
                         <div className="v">
                           {result.authority.official ? result.authority.brand : "—"}
                         </div>
                       </div>
-                      <div className="glass-soft meta-item">
+                      <div className="meta-item">
                         <div className="k">{L("vt")}</div>
                         <div className="v">{result.virusTotal.status}</div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="empty" style={{ padding: "28px 8px" }}>
-                    Paste a URL to verify before the agent continues
-                  </div>
+                  <div className="empty">No check yet</div>
                 )}
               </section>
             </div>
@@ -248,7 +250,7 @@ export default function App() {
                 <p className="sub">{L("checkSub")}</p>
               </div>
             </div>
-            <section className="glass panel check-hero">
+            <section className="panel check-hero">
               <div className="check-row">
                 <div className="field">
                   <input
@@ -263,7 +265,7 @@ export default function App() {
                   {loading ? L("checking") : L("runCheck")}
                 </button>
               </div>
-              <div className="field" style={{ marginTop: 14 }}>
+              <div className="field context">
                 <input
                   className="input"
                   placeholder={L("contextPlaceholder")}
@@ -274,30 +276,30 @@ export default function App() {
             </section>
 
             {result && (
-              <section className="glass result-card">
+              <section className="panel result">
                 <div className="result-head">
                   <div>
                     <div className="url">{result.url}</div>
-                    <div className="sub mono">
+                    <div className="sub">
                       {result.hostname} · {new Date(result.checkedAt).toLocaleString()}
                     </div>
                   </div>
                   <div className="split">
-                    <div className="score-ring">{result.score}</div>
+                    <span className="score">{result.score}</span>
                     <DecisionPill decision={result.decision} />
                   </div>
                 </div>
 
                 <div className="meta-grid">
-                  <div className="glass-soft meta-item">
+                  <div className="meta-item">
                     <div className="k">{L("brand")}</div>
                     <div className="v">{result.authority.brand ?? "—"}</div>
                   </div>
-                  <div className="glass-soft meta-item">
+                  <div className="meta-item">
                     <div className="k">{L("subject")}</div>
                     <div className="v">{result.authority.subject ?? "—"}</div>
                   </div>
-                  <div className="glass-soft meta-item">
+                  <div className="meta-item">
                     <div className="k">{L("rdap")}</div>
                     <div className="v">
                       {result.authority.rdap.status}
@@ -306,7 +308,7 @@ export default function App() {
                         : ""}
                     </div>
                   </div>
-                  <div className="glass-soft meta-item">
+                  <div className="meta-item">
                     <div className="k">{L("vt")}</div>
                     <div className="v">
                       {result.virusTotal.status} · mal {result.virusTotal.malicious} · sus{" "}
@@ -314,11 +316,11 @@ export default function App() {
                       {result.virusTotal.cached ? " · cached" : ""}
                     </div>
                   </div>
-                  <div className="glass-soft meta-item">
+                  <div className="meta-item">
                     <div className="k">{L("lookalike")}</div>
                     <div className="v">{result.authority.lookalikeOf ?? "—"}</div>
                   </div>
-                  <div className="glass-soft meta-item">
+                  <div className="meta-item">
                     <div className="k">{L("official")}</div>
                     <div className="v">
                       {result.authority.official ? "yes" : "no"}
@@ -363,7 +365,7 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <section className="glass panel">
+            <section className="panel">
               {history.length === 0 ? (
                 <div className="empty">{L("noResults")}</div>
               ) : (
@@ -410,7 +412,7 @@ export default function App() {
                 <p className="sub">{L("settingsSub")}</p>
               </div>
             </div>
-            <section className="glass panel">
+            <section className="panel">
               <div className="form-stack">
                 <div className="form-row">
                   <label>{L("vtKey")}</label>
@@ -462,7 +464,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="glass-soft toggle-row">
+                <div className="toggle-row">
                   <div>
                     <div className="title">{L("enableRdap")}</div>
                     <div className="help" style={{ marginTop: 4 }}>
@@ -540,11 +542,11 @@ export default function App() {
         </div>
 
         {error && (
-          <div className="glass toast" style={{ color: "var(--rose)" }}>
+          <div className="toast" style={{ background: "#b91c1c", borderColor: "#b91c1c" }}>
             {L("error")}: {error}
           </div>
         )}
-        {toast && <div className="glass toast">{toast}</div>}
+        {toast && <div className="toast">{toast}</div>}
       </main>
     </div>
   );

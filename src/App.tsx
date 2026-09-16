@@ -574,6 +574,16 @@ export default function App() {
                     </div>
                   </div>
                   <div className="meta-item">
+                    <div className="k">Intel</div>
+                    <div className="v">
+                      {result.threatIntel
+                        ? result.threatIntel.status === "listed"
+                          ? `LISTED · ${result.threatIntel.listedBy.join(", ")}`
+                          : result.threatIntel.status
+                        : "—"}
+                    </div>
+                  </div>
+                  <div className="meta-item">
                     <div className="k">{L("lookalike")}</div>
                     <div className="v">{result.authority.lookalikeOf ?? "—"}</div>
                   </div>

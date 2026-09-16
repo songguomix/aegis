@@ -53,6 +53,20 @@ export interface VirusTotalReport {
   permalink: string | null;
 }
 
+export interface SourceHit {
+  source: string;
+  listed: boolean;
+  detail?: string;
+  url?: string;
+}
+
+export interface ThreatIntelReport {
+  status: "clean" | "listed" | "unknown" | "error" | "skipped";
+  sources: SourceHit[];
+  listedBy: string[];
+  cached: boolean;
+}
+
 export interface GateResult {
   id: string;
   url: string;
@@ -62,6 +76,7 @@ export interface GateResult {
   reasons: Reason[];
   authority: AuthorityReport;
   virusTotal: VirusTotalReport;
+  threatIntel?: ThreatIntelReport;
   checkedAt: string;
   context?: string;
   kind?: "url" | "file" | "batch";

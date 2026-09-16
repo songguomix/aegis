@@ -12,6 +12,8 @@ const baseConfig: EngineConfig = {
   enableRdap: false, // offline tests
 };
 
+const offline = { skipIntel: true } as const;
+
 function vt(over: Partial<VirusTotalReport>): VirusTotalReport {
   return {
     status: "clean",
@@ -95,10 +97,11 @@ describe("lookalike", () => {
 describe("gate decisions (offline)", () => {
   it("ALLOWS official domain with clean VT", async () => {
     primeVtCache("github.com", vt({ status: "clean" }));
-    const r = await runGate("https://github.com/anthropics/anthropic-sdk", {
-      ...baseConfig,
-      vtApiKey: "k",
-    });
+    const r = await runGate(
+      "https://github.com/anthropics/anthropic-sdk",
+      { ...baseConfig, vtApiKey: "k" },
+      offline,
+    );
     expect(r.hostname).toBe("github.com");
     expect(r.decision).toBe("allow");
     expect(r.authority.official).toBe(true);
@@ -108,58 +111,65 @@ describe("gate decisions (offline)", () => {
 
   it("BLOCKS VT malicious", async () => {
     primeVtCache("evil-malware-download.example", vt({ status: "malicious", malicious: 12 }));
-    const r = await runGate("https://evil-malware-download.example/payload", baseConfig);
+    const r = await runGate(
+      "https://evil-malware-download.example/payload",
+      baseConfig,
+      offline,
+    );
     expect(r.decision).toBe("block");
     expect(r.reasons.some((x) => x.code === "vt_malicious")).toBe(true);
   });
 
   it("BLOCKS lookalike of official brand", async () => {
     primeVtCache("guthub.com", vt({ status: "clean" }));
-    const r = await runGate("https://guthub.com/login", baseConfig);
+    const r = await runGate("https://guthub.com/login", baseConfig, offline);
     expect(r.decision).toBe("block");
     expect(r.authority.lookalikeOf).toBe("github.com");
   });
 
   it("BLOCKS denylisted host", async () => {
     primeVtCache("bad.actor", vt({ status: "clean" }));
-    const r = await runGate("https://bad.actor", {
-      ...baseConfig,
-      denylist: ["bad.actor"],
-    });
+    const r = await runGate(
+      "https://bad.actor",
+      { ...baseConfig, denylist: ["bad.actor"] },
+      offline,
+    );
     expect(r.decision).toBe("block");
   });
 
   it("REVIEWS unknown domain when VT degraded (no key)", async () => {
-    const r = await runGate("https://random-startup-site.example", {
-      ...baseConfig,
-      vtApiKey: null,
-      enableRdap: false,
-    });
+    const r = await runGate(
+      "https://random-startup-site.example",
+      { ...baseConfig, vtApiKey: null, enableRdap: false },
+      offline,
+    );
     expect(r.decision).toBe("review");
     expect(r.virusTotal.status).toBe("degraded");
   });
 
   it("ALLOWS unknown domain when allowlisted and VT clean", async () => {
     primeVtCache("internal.corp.example", vt({ status: "clean" }));
-    const r = await runGate("https://internal.corp.example/docs", {
-      ...baseConfig,
-      allowlist: ["internal.corp.example"],
-    });
+    const r = await runGate(
+      "https://internal.corp.example/docs",
+      { ...baseConfig, allowlist: ["internal.corp.example"] },
+      offline,
+    );
     expect(r.decision).toBe("allow");
   });
 
   it("BLOCKS invalid URL", async () => {
-    const r = await runGate("not a url at all", baseConfig);
+    const r = await runGate("not a url at all", baseConfig, offline);
     expect(r.decision).toBe("block");
     expect(r.reasons[0].code).toBe("invalid_url");
   });
 
   it("observe mode never blocks clean unknown", async () => {
     primeVtCache("unknown-but-clean.example", vt({ status: "clean" }));
-    const r = await runGate("https://unknown-but-clean.example", {
-      ...baseConfig,
-      policyMode: "observe",
-    });
+    const r = await runGate(
+      "https://unknown-but-clean.example",
+      { ...baseConfig, policyMode: "observe" },
+      offline,
+    );
     expect(r.decision).toBe("allow");
   });
 });

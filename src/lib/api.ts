@@ -40,6 +40,17 @@ export interface GateResult {
     cached: boolean;
     permalink: string | null;
   };
+  threatIntel?: {
+    status: string;
+    listedBy: string[];
+    cached: boolean;
+    sources: {
+      source: string;
+      listed: boolean;
+      detail?: string;
+      url?: string;
+    }[];
+  };
   checkedAt: string;
   context?: string;
   kind?: "url" | "file" | "batch";

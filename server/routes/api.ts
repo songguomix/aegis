@@ -75,7 +75,7 @@ export function createApiRouter(): express.Router {
         {
           name: "check_url",
           description:
-            "Verify a URL before the agent visits or downloads from it. Returns allow/review/block with authority + VirusTotal evidence.",
+            "Verify a URL before the agent visits or downloads from it. Returns allow/review/block with authority + VirusTotal + free intel (URLhaus, ThreatFox, OpenPhish).",
           input: ["url: string", "context?: string"],
         },
         {

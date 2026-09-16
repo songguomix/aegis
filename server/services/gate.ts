@@ -7,6 +7,7 @@ import type {
 } from "../types.js";
 import { buildAuthority } from "./authority.js";
 import { lookupDomainVt } from "./virustotal.js";
+import { lookupThreatIntel } from "./threatIntel.js";
 import { normalizeHostname } from "./registry.js";
 
 export function parseUrl(input: string): { ok: true; url: URL; hostname: string } | { ok: false; error: string } {
@@ -38,6 +39,8 @@ export interface GateOptions {
   context?: string;
   /** Skip VirusTotal lookup (authority-only, e.g. MCP verify_domain). */
   skipVt?: boolean;
+  /** Skip free threat intel (offline unit tests). */
+  skipIntel?: boolean;
 }
 
 export async function runGate(
@@ -153,8 +156,40 @@ export async function runGate(
     });
   }
 
-  const decision = decide(authority, vt.status, config, reasons);
-  const score = scoreOf(decision, authority, vt.status, reasons);
+  const intel =
+    options.skipVt || options.skipIntel
+      ? { status: "skipped" as const, sources: [], listedBy: [], cached: false }
+      : await lookupThreatIntel(hostname, parsed.url.toString());
+
+  if (intel.status === "listed") {
+    reasons.push({
+      code: "threat_intel_listed",
+      severity: "critical",
+      message: `Listed on free threat intel: ${intel.listedBy.join(", ")}.`,
+    });
+    for (const s of intel.sources.filter((x) => x.listed)) {
+      reasons.push({
+        code: `intel_${s.source.toLowerCase().replace(/\s+/g, "_")}`,
+        severity: "critical",
+        message: `${s.source}: ${s.detail ?? "listed"}`,
+      });
+    }
+  } else if (intel.status === "clean") {
+    reasons.push({
+      code: "threat_intel_clean",
+      severity: "info",
+      message: `Free intel clean (URLhaus / ThreatFox / OpenPhish)${intel.cached ? ", cached" : ""}.`,
+    });
+  } else if (intel.status === "error") {
+    reasons.push({
+      code: "threat_intel_error",
+      severity: "info",
+      message: "Free threat intel sources unavailable; relying on authority + VirusTotal.",
+    });
+  }
+
+  const decision = decide(authority, vt.status, config, reasons, intel.status);
+  const score = scoreOf(decision, authority, vt.status, reasons, intel.status);
 
   return {
     id: `chk_${randomUUID().slice(0, 8)}`,
@@ -165,6 +200,7 @@ export async function runGate(
     reasons,
     authority,
     virusTotal: vt,
+    threatIntel: intel,
     checkedAt: new Date().toISOString(),
     context,
   };
@@ -175,15 +211,22 @@ function decide(
   vtStatus: GateResult["virusTotal"]["status"],
   config: EngineConfig,
   reasons: Reason[],
+  intelStatus?: GateResult["threatIntel"] extends infer T
+    ? T extends { status: infer S }
+      ? S
+      : never
+    : never,
 ): Decision {
+  const intelListed = intelStatus === "listed";
   // Observe mode: never hard-block except denylist/invalid already handled
   const hardBlockSignals =
     authority.denylisted ||
     vtStatus === "malicious" ||
+    intelListed ||
     (authority.lookalikeOf !== null && !authority.allowlisted && authority.official === false && reasons.some((r) => r.code === "lookalike_domain" && r.severity === "critical"));
 
   if (config.policyMode === "observe") {
-    if (authority.denylisted || vtStatus === "malicious") return "block";
+    if (authority.denylisted || vtStatus === "malicious" || intelListed) return "block";
     if (hardBlockSignals || vtStatus === "suspicious" || authority.lookalikeOf) return "review";
     return "allow";
   }
@@ -199,11 +242,12 @@ function decide(
 
   // tri-state (default)
   const vt = vtStatus as string;
-  if (authority.allowlisted && vt !== "malicious" && vt !== "suspicious") {
+  if (authority.allowlisted && vt !== "malicious" && vt !== "suspicious" && !intelListed) {
     return "allow";
   }
   if (authority.official && (vtStatus === "clean" || vtStatus === "degraded" || vtStatus === "unknown")) {
     // official + clean (or no VT data but known brand) → allow
+    if (intelListed) return "block";
     if (vtStatus === "clean" || vtStatus === "degraded") return "allow";
     return "review";
   }
@@ -220,6 +264,7 @@ function scoreOf(
   authority: GateResult["authority"],
   vtStatus: GateResult["virusTotal"]["status"],
   reasons: Reason[],
+  intelStatus?: string,
 ): number {
   let score = 50;
   if (authority.official) score += 30;
@@ -233,6 +278,8 @@ function scoreOf(
   if (vtStatus === "suspicious") score -= 25;
   if (vtStatus === "unknown") score -= 5;
   if (vtStatus === "degraded") score -= 5;
+  if (intelStatus === "listed") score -= 55;
+  if (intelStatus === "clean") score += 10;
   for (const r of reasons) {
     if (r.severity === "critical") score -= 10;
     if (r.severity === "warn") score -= 3;

@@ -7,7 +7,9 @@ import { DEFAULT_CONFIG, type EngineConfig, type GateResult } from "../types.js"
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // dist-server/services → project root; server/services → project root
 const ROOT = path.resolve(__dirname, "..", "..");
-const DATA_DIR = path.join(ROOT, ".aegis");
+const DATA_DIR = process.env.AEGIS_DATA_DIR
+  ? path.resolve(process.env.AEGIS_DATA_DIR)
+  : path.join(ROOT, ".aegis");
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
 const HISTORY_PATH = path.join(DATA_DIR, "history.json");
 const TOKEN_PATH = path.join(DATA_DIR, "token");
@@ -44,6 +46,10 @@ export function getLocalToken(): string | null {
 export function writePortFile(port: number): void {
   ensureDir();
   fs.writeFileSync(PORT_PATH, String(port), "utf8");
+}
+
+export function getDataDir(): string {
+  return DATA_DIR;
 }
 
 export function readPortFile(): number | null {

@@ -8,3 +8,4 @@ dist-server
 .env.*
 worktrees
 .worktrees
+release

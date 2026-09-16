@@ -1,6 +1,6 @@
 import express from "express";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApiRouter } from "./routes/api.js";
 import { loadStore, getConfig, getLocalToken, ensureToken, writePortFile } from "./services/store.js";
@@ -71,12 +71,21 @@ export function createApp(): express.Express {
   app.use("/api/v1", createApiRouter());
 
   // Production console is same-origin with the API (avoids file:// Origin: null).
-  const distUi = fileURLToPath(new URL("../dist/", import.meta.url));
-  if (existsSync(distUi)) {
+  const resourcesPath =
+    (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath ??
+    undefined;
+  const candidates = [
+    fileURLToPath(new URL("../dist/", import.meta.url)),
+    path.join(process.cwd(), "dist"),
+    resourcesPath ? path.join(resourcesPath, "app.asar.unpacked", "dist") : "",
+    resourcesPath ? path.join(resourcesPath, "dist") : "",
+  ].filter(Boolean);
+  const distUi = candidates.find((p) => existsSync(path.join(p, "index.html")));
+  if (distUi) {
     app.use(express.static(distUi));
     app.get("*", (req, res, next) => {
       if (req.path.startsWith("/api/")) return next();
-      res.sendFile(join(distUi, "index.html"));
+      res.sendFile(path.join(distUi, "index.html"));
     });
   }
   return app;

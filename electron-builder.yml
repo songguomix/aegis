@@ -1,0 +1,47 @@
+{
+  "appId": "com.aegis.gateway",
+  "productName": "Aegis",
+  "copyright": "Copyright © 2026 Aegis",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "electron/**/*",
+    "dist/**/*",
+    "dist-server/**/*",
+    "package.json"
+  ],
+  "asarUnpack": [
+    "dist-server/data/**/*",
+    "dist-server/**/*.js",
+    "dist/**/*"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "mac": {
+    "category": "public.app-category.utilities",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["arm64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["arm64"]
+      }
+    ],
+    "identity": null,
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false
+  },
+  "dmg": {
+    "title": "Aegis",
+    "backgroundColor": "#ffffff",
+    "window": {
+      "width": 540,
+      "height": 380
+    }
+  }
+}

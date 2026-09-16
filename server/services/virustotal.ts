@@ -10,7 +10,10 @@ interface CacheEntry {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..", "..");
-const DISK_CACHE = path.join(ROOT, ".aegis", "vt-cache.json");
+const DATA_DIR = process.env.AEGIS_DATA_DIR
+  ? path.resolve(process.env.AEGIS_DATA_DIR)
+  : path.join(ROOT, ".aegis");
+const DISK_CACHE = path.join(DATA_DIR, "vt-cache.json");
 
 const memory = new Map<string, CacheEntry>();
 let lastCallAt = 0;

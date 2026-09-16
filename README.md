@@ -17,37 +17,37 @@ Integrates via **HTTP API** and **MCP** (`check_url`, `verify_domain`, `get_gate
 ```bash
 npm install
 npm test
-npm run dev:server          # HTTP API on http://127.0.0.1:7832/api/v1
-# another terminal
-npm run dev:ui              # Liquid-glass console on http://localhost:5173
 ```
 
-Desktop shell:
+### Desktop app (recommended)
 
 ```bash
-npm run dev                 # server + UI + Electron together
+npm run pack:app
+# 产物：
+#   release/mac-arm64/Aegis.app
+#   release/Aegis-0.1.0-arm64.dmg
+open release/mac-arm64/Aegis.app
+# 或打开 DMG 安装到「应用程序」
 ```
 
-MCP (stdio):
+开发模式：
 
 ```bash
+npm run dev                 # server + UI + Electron
+# 或分开：
+npm run dev:server
+npm run dev:ui
+npm run start               # electron .
+```
+
+### 仅 HTTP / MCP（无桌面壳）
+
+```bash
+npm run dev:server          # http://127.0.0.1:7832/api/v1
 npx tsx server/index.ts --mcp
 ```
 
-Example MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "aegis": {
-      "command": "npx",
-      "args": ["tsx", "/absolute/path/to/server/index.ts", "--mcp"]
-    }
-  }
-}
-```
-
-## HTTP check example
+Example MCP client config: `examples/mcp.config.json`
 
 ```bash
 curl -s http://127.0.0.1:7832/api/v1/check \
@@ -65,4 +65,5 @@ Open the console → **Settings**:
 - Language: English / 中文
 - RDAP toggle
 
-Config persists in `.aegis/config.json`.
+Dev config persists in `.aegis/`. Packaged app data lives in
+`~/Library/Application Support/Aegis/`.

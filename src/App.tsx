@@ -137,27 +137,31 @@ export default function App() {
               </div>
             </div>
 
-            <div className="stats">
-              <div className="stat-card">
-                <div className="label">{L("total")}</div>
-                <div className="value">{stats?.total ?? 0}</div>
-                <div className="hint">VT cache {health?.vtCache ?? 0}</div>
+            <div className="stack">
+              <div className="stats">
+                <div className="stat-card">
+                  <div className="label">{L("total")}</div>
+                  <div className="value">{stats?.total ?? 0}</div>
+                  <div className="hint">VT cache {health?.vtCache ?? 0}</div>
+                </div>
+                <div className="stat-card allow">
+                  <div className="label">{L("allow")}</div>
+                  <div className="value">{stats?.allow ?? 0}</div>
+                  <div className="hint">&nbsp;</div>
+                </div>
+                <div className="stat-card review">
+                  <div className="label">{L("review")}</div>
+                  <div className="value">{stats?.review ?? 0}</div>
+                  <div className="hint">&nbsp;</div>
+                </div>
+                <div className="stat-card block">
+                  <div className="label">{L("block")}</div>
+                  <div className="value">{stats?.block ?? 0}</div>
+                  <div className="hint">&nbsp;</div>
+                </div>
               </div>
-              <div className="stat-card allow">
-                <div className="label">{L("allow")}</div>
-                <div className="value">{stats?.allow ?? 0}</div>
-              </div>
-              <div className="stat-card review">
-                <div className="label">{L("review")}</div>
-                <div className="value">{stats?.review ?? 0}</div>
-              </div>
-              <div className="stat-card block">
-                <div className="label">{L("block")}</div>
-                <div className="value">{stats?.block ?? 0}</div>
-              </div>
-            </div>
 
-            <div className="grid-2">
+              <div className="grid-2">
               <section className="panel">
                 <div className="panel-head">
                   <h3>{L("recent")}</h3>
@@ -239,6 +243,7 @@ export default function App() {
                 )}
               </section>
             </div>
+            </div>
           </>
         )}
 
@@ -250,6 +255,7 @@ export default function App() {
                 <p className="sub">{L("checkSub")}</p>
               </div>
             </div>
+            <div className="stack">
             <section className="panel check-hero">
               <div className="check-row">
                 <div className="field">
@@ -342,6 +348,7 @@ export default function App() {
                 </div>
               </section>
             )}
+            </div>
           </>
         )}
 

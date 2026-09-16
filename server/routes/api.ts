@@ -1,4 +1,7 @@
 import express from "express";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { runGate, parseUrl } from "../services/gate.js";
 import {
@@ -6,6 +9,7 @@ import {
   clearHistory,
   getConfig,
   getHistory,
+  getProjectRoot,
   stats,
   updateConfig,
 } from "../services/store.js";
@@ -26,6 +30,16 @@ const configSchema = z.object({
   denylist: z.array(z.string()).optional(),
 });
 
+function resolveMcpEntry(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.join(here, "..", "index.js"), // dist-server/routes → dist-server/index.js
+    path.join(getProjectRoot(), "dist-server", "index.js"),
+    path.join(getProjectRoot(), "server", "index.ts"),
+  ];
+  return candidates.find((p) => fs.existsSync(p)) ?? candidates[1];
+}
+
 export function createApiRouter(): express.Router {
   const router = express.Router();
 
@@ -37,6 +51,58 @@ export function createApiRouter(): express.Router {
       stats: stats(),
       vtCache: vtCacheSize(),
       policyMode: getConfig().policyMode,
+    });
+  });
+
+  router.get("/integration", (_req, res) => {
+    const entry = resolveMcpEntry();
+    const port = getConfig().httpPort ?? 7832;
+    const base = `http://127.0.0.1:${port}/api/v1`;
+    const isTs = entry.endsWith(".ts");
+    res.json({
+      mcpCommand: isTs
+        ? `npx tsx ${JSON.stringify(entry)} --mcp`
+        : `node ${JSON.stringify(entry)} --mcp`,
+      mcpConfig: {
+        mcpServers: {
+          aegis: isTs
+            ? { command: "npx", args: ["tsx", entry, "--mcp"] }
+            : { command: "node", args: [entry, "--mcp"] },
+        },
+      },
+      tools: [
+        {
+          name: "check_url",
+          description:
+            "Verify a URL before the agent visits or downloads from it. Returns allow/review/block with authority + VirusTotal evidence.",
+          input: ["url: string", "context?: string"],
+        },
+        {
+          name: "verify_domain",
+          description: "Authority-only domain verification (no VirusTotal lookup).",
+          input: ["domain: string"],
+        },
+        {
+          name: "get_gate_status",
+          description: "Engine health, policy mode, VirusTotal mode, decision counts.",
+          input: [],
+        },
+      ],
+      http: {
+        base,
+        checkUrl: `${base}/check`,
+        statusUrl: `${base}/health`,
+        example: {
+          method: "POST",
+          url: `${base}/check`,
+          body: {
+            url: "https://github.com/modelcontextprotocol/servers",
+            context: "download from search",
+          },
+        },
+      },
+      projectRoot: getProjectRoot(),
+      mcpEntry: entry,
     });
   });
 
@@ -57,7 +123,11 @@ export function createApiRouter(): express.Router {
       res.status(400).json({ error: "invalid_request" });
       return;
     }
-    const host = parsed.data.domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0];
+    const host = parsed.data.domain
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .split("/")[0];
     const result = await runGate(host, getConfig(), "verify-domain");
     res.json(result);
   });
@@ -77,7 +147,9 @@ export function createApiRouter(): express.Router {
     const cfg = getConfig();
     res.json({
       ...cfg,
-      vtApiKey: cfg.vtApiKey ? `${cfg.vtApiKey.slice(0, 4)}…${cfg.vtApiKey.slice(-2)}` : null,
+      vtApiKey: cfg.vtApiKey
+        ? `${cfg.vtApiKey.slice(0, 4)}…${cfg.vtApiKey.slice(-2)}`
+        : null,
       hasVtKey: Boolean(cfg.vtApiKey),
     });
   });
@@ -97,7 +169,9 @@ export function createApiRouter(): express.Router {
     const cfg = updateConfig(patch);
     res.json({
       ...cfg,
-      vtApiKey: cfg.vtApiKey ? `${cfg.vtApiKey.slice(0, 4)}…${cfg.vtApiKey.slice(-2)}` : null,
+      vtApiKey: cfg.vtApiKey
+        ? `${cfg.vtApiKey.slice(0, 4)}…${cfg.vtApiKey.slice(-2)}`
+        : null,
       hasVtKey: Boolean(cfg.vtApiKey),
     });
   });

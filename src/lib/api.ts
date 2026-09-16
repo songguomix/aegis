@@ -44,6 +44,36 @@ export interface GateResult {
   context?: string;
 }
 
+export interface IntegrationInfo {
+  mcpCommand: string;
+  mcpConfig: {
+    mcpServers: Record<
+      string,
+      {
+        command: string;
+        args: string[];
+      }
+    >;
+  };
+  tools: {
+    name: string;
+    description: string;
+    input: string[];
+  }[];
+  http: {
+    base: string;
+    checkUrl: string;
+    statusUrl: string;
+    example: {
+      method: string;
+      url: string;
+      body: { url: string; context?: string };
+    };
+  };
+  projectRoot: string;
+  mcpEntry: string;
+}
+
 export interface EngineConfigView {
   vtApiKey: string | null;
   hasVtKey: boolean;
@@ -116,4 +146,5 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(patch),
     }),
+  integration: () => request<IntegrationInfo>("/integration"),
 };

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type EngineConfigView, type GateResult, type Health } from "./lib/api";
+import { api, type EngineConfigView, type GateResult, type Health, type IntegrationInfo } from "./lib/api";
 import { t, type Lang } from "./lib/i18n";
 
-type Tab = "dashboard" | "check" | "history" | "settings";
+type Tab = "dashboard" | "check" | "history" | "settings" | "integrate";
 
 function DecisionPill({ decision }: { decision: GateResult["decision"] }) {
   return <span className={`decision-pill ${decision}`}>{decision}</span>;
@@ -20,20 +20,24 @@ export default function App() {
   const [result, setResult] = useState<GateResult | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [integration, setIntegration] = useState<IntegrationInfo | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const L = useCallback((k: Parameters<typeof t>[1]) => t(lang, k), [lang]);
 
   const refresh = useCallback(async () => {
     try {
-      const [h, hist, cfg] = await Promise.all([
+      const [h, hist, cfg, integ] = await Promise.all([
         api.health(),
         api.history(80),
         api.config(),
+        api.integration(),
       ]);
       setHealth(h);
       setHistory(hist.items);
       setConfig(cfg);
       setLang(cfg.language);
+      setIntegration(integ);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -46,10 +50,22 @@ export default function App() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2200);
+    if (!toast && !copied) return;
+    const id = setTimeout(() => {
+      setToast(null);
+      setCopied(null);
+    }, 2200);
     return () => clearTimeout(id);
-  }, [toast]);
+  }, [toast, copied]);
+
+  async function copyText(key: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+    } catch {
+      setError("Copy failed");
+    }
+  }
 
   async function runCheck() {
     if (!url.trim()) return;
@@ -97,6 +113,7 @@ export default function App() {
               ["check", L("liveCheck")],
               ["history", L("history")],
               ["settings", L("settings")],
+              ["integrate", L("integrate")],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -119,7 +136,7 @@ export default function App() {
       </aside>
 
       <main className="main">
-        <div className={`main-inner${tab === "settings" || tab === "history" ? " wide" : ""}`}>
+        <div className={`main-inner${tab === "settings" || tab === "history" || tab === "integrate" ? " wide" : ""}`}>
         {tab === "dashboard" && (
           <>
             <div className="page-header">
@@ -553,6 +570,126 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+              </section>
+            </div>
+          </>
+        )}
+
+        {tab === "integrate" && (
+          <>
+            <div className="page-header">
+              <div>
+                <h2>{L("integrateTitle")}</h2>
+                <p className="sub">{L("integrateSub")}</p>
+              </div>
+            </div>
+
+            <div className="stack">
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>{L("mcpSection")}</h3>
+                </div>
+                <p className="help" style={{ marginTop: 0 }}>
+                  {L("mcpSub")}
+                </p>
+
+                <div className="code-block">
+                  <div className="code-block-head">
+                    <span>MCP config</span>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() =>
+                        integration &&
+                        copyText("mcp", JSON.stringify(integration.mcpConfig, null, 2))
+                      }
+                    >
+                      {copied === "mcp" ? L("copied") : L("copy")}
+                    </button>
+                  </div>
+                  <pre className="code">
+                    {integration
+                      ? JSON.stringify(integration.mcpConfig, null, 2)
+                      : "{\n  \"mcpServers\": { \"aegis\": { ... } }\n}"}
+                  </pre>
+                </div>
+
+                <div className="code-block" style={{ marginTop: 12 }}>
+                  <div className="code-block-head">
+                    <span>{L("runMcp")}</span>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => integration && copyText("cmd", integration.mcpCommand)}
+                    >
+                      {copied === "cmd" ? L("copied") : L("copy")}
+                    </button>
+                  </div>
+                  <pre className="code">{integration?.mcpCommand ?? "node … --mcp"}</pre>
+                  <p className="help">{L("runMcpHelp")}</p>
+                </div>
+
+                <div className="panel-head" style={{ marginTop: 16 }}>
+                  <h3>{L("mcpTools")}</h3>
+                </div>
+                <ul className="tool-list">
+                  {(integration?.tools ?? []).map((tool) => (
+                    <li key={tool.name}>
+                      <code>{tool.name}</code>
+                      <span>{tool.description}</span>
+                      {tool.input.length > 0 && (
+                        <em className="mono">{tool.input.join(", ")}</em>
+                      )}
+                    </li>
+                  ))}
+                  {integration?.tools == null && <li className="empty">…</li>}
+                </ul>
+                <p className="help">{L("replacePathNote")}</p>
+              </section>
+
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>{L("httpSection")}</h3>
+                </div>
+                <p className="help" style={{ marginTop: 0 }}>
+                  {L("httpSub")}
+                </p>
+                <div className="code-block">
+                  <div className="code-block-head">
+                    <span>{L("httpExample")}</span>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() =>
+                        integration &&
+                        copyText(
+                          "http",
+                          `curl -sS ${integration.http.checkUrl} -H 'content-type: application/json' -d '${JSON.stringify(
+                            integration.http.example.body,
+                          )}'`,
+                        )
+                      }
+                    >
+                      {copied === "http" ? L("copied") : L("copy")}
+                    </button>
+                  </div>
+                  <pre className="code">
+                    {integration
+                      ? `curl -sS ${integration.http.checkUrl} \\\n  -H 'content-type: application/json' \\\n  -d '${JSON.stringify(integration.http.example.body, null, 2)}'`
+                      : "curl -sS http://127.0.0.1:7832/api/v1/check -H 'content-type: application/json' -d '{\"url\":\"https://example.com\"}'"}
+                  </pre>
+                </div>
+                <ul className="tool-list" style={{ marginTop: 12 }}>
+                  <li>
+                    <code>{integration?.http.base ?? "http://127.0.0.1:7832/api/v1"}</code>
+                    <span>API base</span>
+                  </li>
+                  <li>
+                    <code>{integration?.http.checkUrl ?? "/check"}</code>
+                    <span>POST URL / host check</span>
+                  </li>
+                  <li>
+                    <code>{integration?.http.statusUrl ?? "/health"}</code>
+                    <span>GET engine health</span>
+                  </li>
+                </ul>
               </section>
             </div>
           </>

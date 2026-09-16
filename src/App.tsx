@@ -1,8 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type EngineConfigView, type GateResult, type Health, type IntegrationInfo } from "./lib/api";
+import {
+  api,
+  type BatchResult,
+  type EngineConfigView,
+  type FileGateResult,
+  type GateResult,
+  type Health,
+  type IntegrationInfo,
+} from "./lib/api";
 import { t, type Lang } from "./lib/i18n";
 
 type Tab = "dashboard" | "check" | "history" | "settings" | "integrate";
+type CheckMode = "url" | "file" | "batch";
 
 function DecisionPill({ decision }: { decision: GateResult["decision"] }) {
   return <span className={`decision-pill ${decision}`}>{decision}</span>;
@@ -16,6 +25,12 @@ export default function App() {
   const [config, setConfig] = useState<EngineConfigView | null>(null);
   const [url, setUrl] = useState("");
   const [context, setContext] = useState("");
+  const [checkMode, setCheckMode] = useState<CheckMode>("url");
+  const [hash, setHash] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [batchText, setBatchText] = useState("");
+  const [fileResult, setFileResult] = useState<FileGateResult | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GateResult | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -93,17 +108,71 @@ export default function App() {
   }
 
   async function runCheck() {
-    if (!url.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const r = await api.check(url.trim(), context.trim() || undefined);
-      setResult(r);
+      if (checkMode === "file") {
+        if (!hash.trim()) return;
+        const r = await api.checkFile(
+          hash.trim(),
+          fileName.trim() || undefined,
+          context.trim() || undefined,
+        );
+        setFileResult(r);
+        setResult(null);
+        setBatchResult(null);
+        setToast(L("fileChecked"));
+      } else if (checkMode === "batch") {
+        const urls = batchText
+          .split(/[\n\s,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .slice(0, 20);
+        if (!urls.length) return;
+        const r = await api.checkBatch(urls, context.trim() || undefined);
+        setBatchResult(r);
+        setResult(null);
+        setFileResult(null);
+        setToast(`${L("batchDone")} · ${r.total}`);
+      } else {
+        if (!url.trim()) return;
+        const r = await api.check(url.trim(), context.trim() || undefined);
+        setResult(r);
+        setFileResult(null);
+        setBatchResult(null);
+      }
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+    }
+  }
+
+  function canRunCheck(): boolean {
+    if (loading) return true;
+    if (checkMode === "file") return !hash.trim();
+    if (checkMode === "batch") return !batchText.trim();
+    return !url.trim();
+  }
+
+  async function apiBaseExport(format: "csv" | "json") {
+    try {
+      const w = window as unknown as { aegis?: { getApiBase?: () => Promise<string> } };
+      const base = w.aegis?.getApiBase
+        ? await w.aegis.getApiBase()
+        : import.meta.env.DEV
+          ? "/api/v1"
+          : "http://127.0.0.1:7832/api/v1";
+      const res = await fetch(`${base}/history/export?format=${format}`);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `aegis-history.${format}`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -298,20 +367,86 @@ export default function App() {
             </div>
             <div className="stack">
             <section className="panel check-hero">
-              <div className="check-row">
-                <div className="field">
-                  <input
-                    className="input"
-                    placeholder={L("urlPlaceholder")}
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && runCheck()}
-                  />
-                </div>
-                <button className="btn" onClick={runCheck} disabled={loading || !url.trim()}>
-                  {loading ? L("checking") : L("runCheck")}
-                </button>
+              <div className="seg" role="tablist">
+                {(
+                  [
+                    ["url", L("modeUrl")],
+                    ["file", L("modeFile")],
+                    ["batch", L("modeBatch")],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={checkMode === id}
+                    className={`seg-item${checkMode === id ? " active" : ""}`}
+                    onClick={() => setCheckMode(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
+
+              {checkMode === "url" && (
+                <div className="check-row" style={{ marginTop: 12 }}>
+                  <div className="field">
+                    <input
+                      className="input"
+                      placeholder={L("urlPlaceholder")}
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && runCheck()}
+                    />
+                  </div>
+                  <button className="btn" onClick={runCheck} disabled={canRunCheck()}>
+                    {loading ? L("checking") : L("runCheck")}
+                  </button>
+                </div>
+              )}
+
+              {checkMode === "file" && (
+                <div className="check-row" style={{ marginTop: 12 }}>
+                  <div className="field">
+                    <input
+                      className="input mono"
+                      placeholder={L("hashPlaceholder")}
+                      value={hash}
+                      onChange={(e) => setHash(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && runCheck()}
+                    />
+                  </div>
+                  <div className="field" style={{ maxWidth: 200 }}>
+                    <input
+                      className="input"
+                      placeholder={L("fileNamePlaceholder")}
+                      value={fileName}
+                      onChange={(e) => setFileName(e.target.value)}
+                    />
+                  </div>
+                  <button className="btn" onClick={runCheck} disabled={canRunCheck()}>
+                    {loading ? L("checking") : L("runCheck")}
+                  </button>
+                </div>
+              )}
+
+              {checkMode === "batch" && (
+                <>
+                  <textarea
+                    className="input"
+                    style={{ marginTop: 12, minHeight: 120 }}
+                    placeholder={L("batchPlaceholder")}
+                    value={batchText}
+                    onChange={(e) => setBatchText(e.target.value)}
+                  />
+                  <div className="check-row" style={{ marginTop: 10 }}>
+                    <button className="btn" onClick={runCheck} disabled={canRunCheck()}>
+                      {loading ? L("checking") : L("runCheck")}
+                    </button>
+                  </div>
+                </>
+              )}
+
               <div className="field context">
                 <input
                   className="input"
@@ -321,6 +456,81 @@ export default function App() {
                 />
               </div>
             </section>
+
+            {fileResult && (
+              <section className="panel result">
+                <div className="result-head">
+                  <div>
+                    <div className="url mono">{fileResult.fileName || fileResult.hash}</div>
+                    <div className="sub">
+                      {fileResult.hashType} · {fileResult.hash.slice(0, 24)}… ·{" "}
+                      {new Date(fileResult.checkedAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="split">
+                    <span className="score">{fileResult.score}</span>
+                    <DecisionPill decision={fileResult.decision} />
+                  </div>
+                </div>
+                <div className="meta-grid cols-2">
+                  <div className="meta-item">
+                    <div className="k">{L("vt")}</div>
+                    <div className="v">
+                      {fileResult.virusTotal.status} · mal {fileResult.virusTotal.malicious} ·
+                      sus {fileResult.virusTotal.suspicious}
+                    </div>
+                  </div>
+                  <div className="meta-item">
+                    <div className="k">{L("decision")}</div>
+                    <div className="v">{fileResult.decision}</div>
+                  </div>
+                </div>
+                <div className="reasons">
+                  {fileResult.reasons.map((r, i) => (
+                    <div className="reason" key={`${r.code}-${i}`}>
+                      <span className={`sev ${r.severity}`}>{r.severity}</span>
+                      <span>{r.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {batchResult && (
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>
+                    Batch · {batchResult.total} · allow {batchResult.allow} · review{" "}
+                    {batchResult.review} · block {batchResult.block}
+                  </h3>
+                  <DecisionPill decision={batchResult.decision} />
+                </div>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>{L("decision")}</th>
+                      <th>{L("hostname")}</th>
+                      <th>{L("vt")}</th>
+                      <th style={{ textAlign: "right" }}>{L("score")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchResult.results.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <DecisionPill decision={item.decision} />
+                        </td>
+                        <td className="mono">{item.hostname}</td>
+                        <td>{item.virusTotal.status}</td>
+                        <td>
+                          <div className="score">{item.score}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
 
             {result && (
               <section className="panel result">
@@ -401,6 +611,26 @@ export default function App() {
                 <p className="sub">{history.length} records</p>
               </div>
               <div className="actions">
+                <a
+                  className="btn btn-ghost"
+                  href={`${(window as unknown as { aegis?: { getApiBase?: () => Promise<string> } }).aegis ? "" : "/api/v1"}/history/export?format=csv`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void apiBaseExport("csv");
+                  }}
+                >
+                  CSV
+                </a>
+                <a
+                  className="btn btn-ghost"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void apiBaseExport("json");
+                  }}
+                >
+                  JSON
+                </a>
                 <button
                   className="btn btn-ghost"
                   onClick={async () => {

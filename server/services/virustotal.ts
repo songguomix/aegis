@@ -186,3 +186,109 @@ export function vtCacheSize(): number {
 export function primeVtCache(domain: string, value: VirusTotalReport): void {
   memory.set(domain.toLowerCase(), { at: Date.now(), value });
 }
+
+async function vtFetch(path: string, apiKey: string): Promise<Response> {
+  const now = Date.now();
+  if (now < backoffUntil) {
+    throw Object.assign(new Error("backoff"), { status: 429 });
+  }
+  const wait = MIN_INTERVAL_MS - (now - lastCallAt);
+  if (wait > 0) {
+    await new Promise((r) => setTimeout(r, wait));
+  }
+  lastCallAt = Date.now();
+  return fetch(`https://www.virustotal.com/api/v3${path}`, {
+    headers: { "x-apikey": apiKey, Accept: "application/json" },
+  });
+}
+
+function reportFromAttributes(attrs: {
+  last_analysis_stats?: {
+    malicious?: number;
+    suspicious?: number;
+    harmless?: number;
+    undetected?: number;
+  };
+  reputation?: number;
+  categories?: Record<string, string>;
+}, permalink: string): VirusTotalReport {
+  const stats = attrs.last_analysis_stats ?? {};
+  const categories = attrs.categories ? Object.values(attrs.categories).slice(0, 5) : [];
+  return {
+    status: mapStats(stats),
+    malicious: stats.malicious ?? 0,
+    suspicious: stats.suspicious ?? 0,
+    harmless: stats.harmless ?? 0,
+    undetected: stats.undetected ?? 0,
+    reputation: attrs.reputation ?? null,
+    categories,
+    cached: false,
+    permalink,
+  };
+}
+
+/** VirusTotal file lookup by hash (sha256 / sha1 / md5). */
+export async function lookupFileVt(
+  hash: string,
+  apiKey: string | null,
+  ttlMs = 6 * 60 * 60 * 1000,
+): Promise<VirusTotalReport> {
+  const id = hash.toLowerCase().trim();
+  const cacheKey = `file:${id}`;
+  const cached = memory.get(cacheKey);
+  if (cached && Date.now() - cached.at < ttlMs) {
+    return { ...cached.value, cached: true };
+  }
+  if (!apiKey) return degraded();
+
+  try {
+    const res = await vtFetch(`/files/${encodeURIComponent(id)}`, apiKey);
+    if (res.status === 404) {
+      const value: VirusTotalReport = {
+        status: "unknown",
+        malicious: 0,
+        suspicious: 0,
+        harmless: 0,
+        undetected: 0,
+        reputation: null,
+        categories: [],
+        cached: false,
+        permalink: `https://www.virustotal.com/gui/file/${id}`,
+      };
+      memory.set(cacheKey, { at: Date.now(), value });
+      persistDisk();
+      return value;
+    }
+    if (res.status === 429) {
+      backoffUntil = Date.now() + 60_000;
+      return degraded();
+    }
+    if (!res.ok) return { ...degraded(), status: "error" };
+
+    const body = (await res.json()) as {
+      data?: {
+        attributes?: {
+          last_analysis_stats?: {
+            malicious?: number;
+            suspicious?: number;
+            harmless?: number;
+            undetected?: number;
+          };
+          reputation?: number;
+          categories?: Record<string, string>;
+          meaningful_name?: string;
+        };
+      };
+    };
+    const value = reportFromAttributes(
+      body.data?.attributes ?? {},
+      `https://www.virustotal.com/gui/file/${id}`,
+    );
+    memory.set(cacheKey, { at: Date.now(), value });
+    persistDisk();
+    return value;
+  } catch (err) {
+    if ((err as { status?: number }).status === 429) return degraded();
+    return degraded();
+  }
+}

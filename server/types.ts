@@ -64,6 +64,27 @@ export interface GateResult {
   virusTotal: VirusTotalReport;
   checkedAt: string;
   context?: string;
+  kind?: "url" | "file" | "batch";
+  batch?: {
+    total: number;
+    allow: number;
+    review: number;
+    block: number;
+  };
+}
+
+export interface FileGateResult {
+  id: string;
+  hash: string;
+  hashType: "sha256" | "sha1" | "md5";
+  fileName: string | null;
+  decision: Decision;
+  score: number;
+  reasons: Reason[];
+  virusTotal: VirusTotalReport;
+  checkedAt: string;
+  context?: string;
+  kind: "file";
 }
 
 export interface EngineConfig {

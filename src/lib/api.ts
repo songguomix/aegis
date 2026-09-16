@@ -42,6 +42,30 @@ export interface GateResult {
   };
   checkedAt: string;
   context?: string;
+  kind?: "url" | "file" | "batch";
+}
+
+export interface FileGateResult {
+  id: string;
+  hash: string;
+  hashType: string;
+  fileName: string | null;
+  decision: Decision;
+  score: number;
+  reasons: Reason[];
+  virusTotal: GateResult["virusTotal"];
+  checkedAt: string;
+  context?: string;
+  kind: "file";
+}
+
+export interface BatchResult {
+  decision: Decision;
+  total: number;
+  allow: number;
+  review: number;
+  block: number;
+  results: GateResult[];
 }
 
 export interface IntegrationInfo {
@@ -147,4 +171,14 @@ export const api = {
       body: JSON.stringify(patch),
     }),
   integration: () => request<IntegrationInfo>("/integration"),
+  checkFile: (hash: string, fileName?: string, context?: string) =>
+    request<FileGateResult>("/check-file", {
+      method: "POST",
+      body: JSON.stringify({ hash, fileName, context }),
+    }),
+  checkBatch: (urls: string[], context?: string) =>
+    request<BatchResult>("/check-batch", {
+      method: "POST",
+      body: JSON.stringify({ urls, context }),
+    }),
 };

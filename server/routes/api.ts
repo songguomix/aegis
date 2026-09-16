@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { runGate, parseUrl } from "../services/gate.js";
+import { runFileGate } from "../services/fileGate.js";
 import {
   appendHistory,
   clearHistory,
@@ -78,6 +79,18 @@ export function createApiRouter(): express.Router {
           input: ["url: string", "context?: string"],
         },
         {
+          name: "check_urls_batch",
+          description:
+            "Check up to 20 URLs (e.g. search results). Returns per-URL decisions and worst-case overall decision.",
+          input: ["urls: string[]", "context?: string"],
+        },
+        {
+          name: "check_file_hash",
+          description:
+            "VirusTotal lookup for MD5/SHA1/SHA256 of a downloaded file. Call before opening/executing.",
+          input: ["hash: string", "fileName?: string", "context?: string"],
+        },
+        {
           name: "verify_domain",
           description: "Authority-only domain verification (no VirusTotal lookup).",
           input: ["domain: string"],
@@ -115,6 +128,118 @@ export function createApiRouter(): express.Router {
     const result = await runGate(parsed.data.url, getConfig(), parsed.data.context);
     appendHistory(result);
     res.json(result);
+  });
+
+  router.post("/check-file", async (req, res) => {
+    const parsed = z
+      .object({
+        hash: z.string().min(1),
+        fileName: z.string().optional(),
+        context: z.string().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const result = await runFileGate(parsed.data.hash, getConfig(), {
+      fileName: parsed.data.fileName ?? null,
+      context: parsed.data.context,
+    });
+    appendHistory({
+      id: result.id,
+      url: `file:${result.hash.slice(0, 12)}…`,
+      hostname: result.fileName ?? result.hash.slice(0, 16),
+      decision: result.decision,
+      score: result.score,
+      reasons: result.reasons,
+      authority: {
+        official: false,
+        brand: null,
+        subject: null,
+        category: "file",
+        rdap: { status: "skipped", registrant: null, organization: null },
+        lookalikeOf: null,
+        punycode: false,
+        mixedScript: false,
+        allowlisted: false,
+        denylisted: false,
+      },
+      virusTotal: result.virusTotal,
+      checkedAt: result.checkedAt,
+      context: result.context,
+      kind: "file",
+    });
+    res.json(result);
+  });
+
+  router.post("/check-batch", async (req, res) => {
+    const parsed = z
+      .object({
+        urls: z.array(z.string().min(1)).min(1).max(20),
+        context: z.string().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request", details: parsed.error.flatten() });
+      return;
+    }
+    const results = [];
+    for (const url of parsed.data.urls) {
+      const r = await runGate(url, getConfig(), parsed.data.context ?? "batch");
+      results.push(r);
+      appendHistory(r);
+    }
+    const allow = results.filter((r) => r.decision === "allow").length;
+    const review = results.filter((r) => r.decision === "review").length;
+    const block = results.filter((r) => r.decision === "block").length;
+    // Worst-decision for the batch as a whole
+    const decision = block > 0 ? "block" : review > 0 ? "review" : "allow";
+    res.json({
+      decision,
+      total: results.length,
+      allow,
+      review,
+      block,
+      results,
+    });
+  });
+
+  router.get("/history/export", (req, res) => {
+    const format = String(req.query.format ?? "json").toLowerCase();
+    const items = getHistory(500);
+    if (format === "csv") {
+      const header = [
+        "checkedAt",
+        "decision",
+        "score",
+        "hostname",
+        "url",
+        "vtStatus",
+        "brand",
+        "kind",
+      ];
+      const rows = items.map((h) =>
+        [
+          h.checkedAt,
+          h.decision,
+          h.score,
+          `"${(h.hostname || "").replace(/"/g, '""')}"`,
+          `"${(h.url || "").replace(/"/g, '""')}"`,
+          h.virusTotal.status,
+          h.authority.brand ?? "",
+          h.kind ?? "url",
+        ].join(","),
+      );
+      const csv = [header.join(","), ...rows].join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", "attachment; filename=aegis-history.csv");
+      res.send(csv);
+      return;
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", "attachment; filename=aegis-history.json");
+    res.send(JSON.stringify({ exportedAt: new Date().toISOString(), items }, null, 2));
   });
 
   router.post("/verify-domain", async (req, res) => {

@@ -1,14 +1,25 @@
 ---
 feature: aegis-mvp
-status: designed
+status: delivered
 updated: 2026-09-16
 branch: feat/aegis-mvp
-commits: 5d06de1..pending
+commits: 5d06de1..3db4557
 ---
 
 # Aegis MVP — AI Agent Network Security Gateway
 
 ## Report
+
+**What was built** — Aegis is a local AI-agent network security gateway. Before an agent visits a URL it runs a tri-state gate (`allow` / `review` / `block`) over an embedded official-domain authority registry (brand + subject), lookalike/typosquat/homograph detection, optional RDAP subject checks, and VirusTotal reputation (API key optional; degrades to authority-only). Integrations are HTTP (`POST /api/v1/check`) and MCP (`check_url`, `verify_domain`, `get_gate_status`). An Electron + React console with liquid-glass UI provides Dashboard, Live Check, History, and Settings (VT key, policy mode, allow/deny lists, EN/中文). Localhost trust boundary: bind `127.0.0.1`, origin-allowlist CORS (never `*`), token-gated mutations without Origin, production UI served same-origin from Express.
+
+**Verification** — `npm test` 19/19 PASS; `npm run typecheck` PASS; `npm run build` PASS (`dist/` + `dist-server/data`); live HTTP smoke: github.com→allow, guthub.com→block (typosquat), unknown→review; MCP stdio tools list + `check_url` PASS; compiled `node dist-server/index.js` boots, serves UI 200, registry lookup works; security checks: foreign Origin PUT→403, no-token mutate→401, local Origin→200, evil preflight→403. First review REQUEST_CHANGES (CORS `*`, missing dist registry); both criticals fixed and re-review APPROVE.
+
+**Journey log** —
+1. Greenfield empty folder → in-place feature branch (no nested worktree) so Desktop path *is* the product.
+2. Electron binary skipped at install (`ELECTRON_SKIP_BINARY_DOWNLOAD=1`) for speed; shell code is wired, binary install left to user (`npx electron` / normal install).
+3. Review caught open CORS on a loopback security API — treat localhost browsers as attackers; origin allowlist + mutating token.
+4. `tsc` does not copy JSON assets; build now has `scripts/copy-server-assets.mjs`. Path with spaces requires `fileURLToPath`, not `URL.pathname`.
+5. VT rate limit was capped at 2s (ineffective); now full 16s interval + 60s 429 backoff + disk cache under `.aegis/vt-cache.json`.
 
 ## [S1] Problem
 
@@ -50,9 +61,20 @@ Default posture is fail-closed on clear danger, fail-watch on uncertainty.
 
 ### VirusTotal
 
-- Config: API key in Settings; free-tier friendly rate limit (~4/min) + disk/memory cache (TTL 6h).
+- Config: API key in Settings; free-tier friendly rate limit (~4/min enforced) + disk/memory cache (TTL 6h).
 - Domain report → `last_analysis_stats` + categories + reputation.
 - No key or network fail → `vtStatus: "degraded"`; gate still runs authority checks; non-trusted domains stay REVIEW.
+- 429 → 60s backoff, subsequent lookups degrade until backoff expires.
+- MCP `verify_domain` skips VT (`skipVt`) so authority-only checks do not burn quota.
+
+### Local trust boundary (post-review hardening)
+
+- HTTP server binds `127.0.0.1` only.
+- CORS never uses `*`. Origins are accepted only if they match `http(s)://(127.0.0.1|localhost)(:port)?`.
+- Foreign browser origins: preflight and mutating requests → 403.
+- Mutating methods (`PUT`/`PATCH`/`DELETE`) without `Origin` require `X-Aegis-Token` (file `.aegis/token`, mode 0600).
+- Production console is served from the same Express process (`dist/`), so Electron loads `http://127.0.0.1:<port>/` (same-origin).
+- Bound port is written to `.aegis/port` for Electron discovery (7832–7842 fallback).
 
 ### Contracts
 
@@ -89,6 +111,8 @@ Default posture is fail-closed on clear danger, fail-watch on uncertainty.
 }
 ```
 
+Invalid URL returns HTTP 200 with `decision: "block"` and reason `invalid_url` (schema-invalid JSON bodies still return HTTP 400).
+
 #### MCP tools
 
 - `check_url({ url })` → same gate result (stringified JSON for agents)
@@ -105,10 +129,10 @@ Default posture is fail-closed on clear danger, fail-watch on uncertainty.
 
 ### Error behavior
 
-- Invalid URL → HTTP 400 / decision `block` with reason `invalid_url`.
+- Invalid URL → decision `block` with reason `invalid_url` (HTTP 200 body; not a transport error).
 - VT 429 → backoff, mark degraded for that lookup, do not crash gate.
 - RDAP timeout (3s) → skip, continue with static authority + lookalike only.
-- Core port busy → try next port in 7832–7842 range.
+- Core port busy → try next port in 7832–7842 range; port file + Electron discovery.
 
 ## [S3] Out of Scope (MVP)
 
@@ -121,10 +145,11 @@ Default posture is fail-closed on clear danger, fail-watch on uncertainty.
 
 ## Tasks
 
-- [ ] T1: Workspace git init + feature branch + toolchain — acceptance: repo on `feat/aegis-mvp`, Node/npm available (done at design time)
-- [ ] T2: Spec document `docs/compose/spec/aegis-mvp.md` — acceptance: this file exists with settled contracts
-- [ ] T3: Core engine (authority registry, lookalike, VT client with cache/degrade, tri-state gate) — acceptance: unit tests pass for allow/review/block paths offline
-- [ ] T4: HTTP API + MCP server exposing `check_url` — acceptance: `POST /api/v1/check` returns contract; MCP tools registered
-- [ ] T5: Electron shell + liquid-glass React console — acceptance: UI renders Dashboard/Live Check/History/Settings; check from UI hits API
-- [ ] T6: Verification — acceptance: `npm test` and `npm run build` succeed; server boots
-- [ ] T7: Review + finalize spec — acceptance: independent review passes; Report filled; status delivered
+- [x] T1: Workspace git init + feature branch + toolchain — acceptance: repo on `feat/aegis-mvp`, Node/npm available
+- [x] T2: Spec document `docs/compose/spec/aegis-mvp.md` — acceptance: this file exists with settled contracts
+- [x] T3: Core engine (authority registry, lookalike, VT client with cache/degrade, tri-state gate) — acceptance: unit tests pass for allow/review/block paths offline
+- [x] T4: HTTP API + MCP server exposing `check_url` — acceptance: `POST /api/v1/check` returns contract; MCP tools registered
+- [x] T5: Electron shell + liquid-glass React console — acceptance: UI renders Dashboard/Live Check/History/Settings; check from UI hits API (Vite build + same-origin serve verified; Electron binary not downloaded in this environment)
+- [x] T6: Verification — acceptance: `npm test` and `npm run build` succeed; server boots
+- [x] T7: Review + finalize spec — acceptance: independent review passes; Report filled; status delivered
+- [x] T8: Post-review critical fixes (CORS/token + dist registry copy + path spaces) — acceptance: re-review APPROVE

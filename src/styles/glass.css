@@ -668,6 +668,14 @@ select.input {
   color: var(--text-2);
 }
 
+.code-block-head .hint {
+  font-weight: 400;
+  color: var(--text-3);
+  font-size: 11px;
+  margin-right: auto;
+  margin-left: 12px;
+}
+
 .code {
   margin: 0;
   padding: 12px 14px;
@@ -677,8 +685,31 @@ select.input {
   color: var(--text);
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 220px;
+  max-height: 260px;
   overflow: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  outline: none;
+}
+
+.code::selection,
+.code *::selection {
+  background: #c7d2fe;
+  color: #111827;
+}
+
+.input,
+textarea.input {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: auto;
+}
+
+.input::selection,
+textarea.input::selection {
+  background: #c7d2fe;
+  color: #111827;
 }
 
 .btn-sm {

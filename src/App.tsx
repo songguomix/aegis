@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type EngineConfigView, type GateResult, type Health, type IntegrationInfo } from "./lib/api";
 import { t, type Lang } from "./lib/i18n";
 
@@ -64,6 +64,31 @@ export default function App() {
       setCopied(key);
     } catch {
       setError("Copy failed");
+    }
+  }
+
+  function selectCode(e: React.MouseEvent<HTMLPreElement>) {
+    const el = e.currentTarget;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
+
+  function onCodeKeyDown(e: React.KeyboardEvent<HTMLPreElement>) {
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      const el = e.currentTarget;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+    if (meta && e.key.toLowerCase() === "c" && window.getSelection()?.toString()) {
+      // native copy of selection; no-op here
     }
   }
 
@@ -596,6 +621,7 @@ export default function App() {
                 <div className="code-block">
                   <div className="code-block-head">
                     <span>MCP config</span>
+                    <span className="hint">Click code to select · Cmd/Ctrl+C</span>
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() =>
@@ -606,7 +632,13 @@ export default function App() {
                       {copied === "mcp" ? L("copied") : L("copy")}
                     </button>
                   </div>
-                  <pre className="code">
+                  <pre
+                    className="code"
+                    tabIndex={0}
+                    onClick={selectCode}
+                    onKeyDown={onCodeKeyDown}
+                    title="Click to select · Cmd/Ctrl+A · Cmd/Ctrl+C"
+                  >
                     {integration
                       ? JSON.stringify(integration.mcpConfig, null, 2)
                       : "{\n  \"mcpServers\": { \"aegis\": { ... } }\n}"}
@@ -623,7 +655,15 @@ export default function App() {
                       {copied === "cmd" ? L("copied") : L("copy")}
                     </button>
                   </div>
-                  <pre className="code">{integration?.mcpCommand ?? "node … --mcp"}</pre>
+                  <pre
+                    className="code"
+                    tabIndex={0}
+                    onClick={selectCode}
+                    onKeyDown={onCodeKeyDown}
+                    title="Click to select · Cmd/Ctrl+A · Cmd/Ctrl+C"
+                  >
+                    {integration?.mcpCommand ?? "node … --mcp"}
+                  </pre>
                   <p className="help">{L("runMcpHelp")}</p>
                 </div>
 
@@ -670,7 +710,13 @@ export default function App() {
                       {copied === "http" ? L("copied") : L("copy")}
                     </button>
                   </div>
-                  <pre className="code">
+                  <pre
+                    className="code"
+                    tabIndex={0}
+                    onClick={selectCode}
+                    onKeyDown={onCodeKeyDown}
+                    title="Click to select · Cmd/Ctrl+A · Cmd/Ctrl+C"
+                  >
                     {integration
                       ? `curl -sS ${integration.http.checkUrl} \\\n  -H 'content-type: application/json' \\\n  -d '${JSON.stringify(integration.http.example.body, null, 2)}'`
                       : "curl -sS http://127.0.0.1:7832/api/v1/check -H 'content-type: application/json' -d '{\"url\":\"https://example.com\"}'"}

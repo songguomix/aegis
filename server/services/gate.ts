@@ -34,11 +34,22 @@ function clamp(n: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, n));
 }
 
+export interface GateOptions {
+  context?: string;
+  /** Skip VirusTotal lookup (authority-only, e.g. MCP verify_domain). */
+  skipVt?: boolean;
+}
+
 export async function runGate(
   rawUrl: string,
   config: EngineConfig,
-  context?: string,
+  contextOrOptions?: string | GateOptions,
 ): Promise<GateResult> {
+  const options: GateOptions =
+    typeof contextOrOptions === "string"
+      ? { context: contextOrOptions }
+      : (contextOrOptions ?? {});
+  const context = options.context;
   const parsed = parseUrl(rawUrl);
   if (!parsed.ok) {
     return {
@@ -84,9 +95,27 @@ export async function runGate(
 
   const { hostname } = parsed;
   const { report: authority, reasons } = await buildAuthority(hostname, config);
-  const vt = await lookupDomainVt(hostname, config.vtApiKey, config.vtCacheTtlMs);
+  const vt = options.skipVt
+    ? {
+        status: "degraded" as const,
+        malicious: 0,
+        suspicious: 0,
+        harmless: 0,
+        undetected: 0,
+        reputation: null,
+        categories: [] as string[],
+        cached: false,
+        permalink: null,
+      }
+    : await lookupDomainVt(hostname, config.vtApiKey, config.vtCacheTtlMs);
 
-  if (vt.status === "malicious") {
+  if (options.skipVt) {
+    reasons.push({
+      code: "vt_skipped",
+      severity: "info",
+      message: "VirusTotal lookup skipped (authority-only check).",
+    });
+  } else if (vt.status === "malicious") {
     reasons.push({
       code: "vt_malicious",
       severity: "critical",

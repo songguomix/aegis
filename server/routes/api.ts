@@ -63,8 +63,9 @@ export function createApiRouter(): express.Router {
   });
 
   router.get("/history", (req, res) => {
-    const limit = Number(req.query.limit ?? 100);
-    res.json({ items: getHistory(Number.isFinite(limit) ? limit : 100) });
+    const raw = Number(req.query.limit ?? 100);
+    const limit = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 500) : 100;
+    res.json({ items: getHistory(limit) });
   });
 
   router.delete("/history", (_req, res) => {

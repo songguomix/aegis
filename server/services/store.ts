@@ -1,12 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, type EngineConfig, type GateResult } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "..", "..", ".aegis");
+// dist-server/services → project root; server/services → project root
+const ROOT = path.resolve(__dirname, "..", "..");
+const DATA_DIR = path.join(ROOT, ".aegis");
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
 const HISTORY_PATH = path.join(DATA_DIR, "history.json");
+const TOKEN_PATH = path.join(DATA_DIR, "token");
+const PORT_PATH = path.join(DATA_DIR, "port");
 
 const MAX_HISTORY = 500;
 
@@ -15,6 +20,44 @@ let history: GateResult[] = [];
 
 function ensureDir(): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+export function ensureToken(): string {
+  ensureDir();
+  if (fs.existsSync(TOKEN_PATH)) {
+    return fs.readFileSync(TOKEN_PATH, "utf8").trim();
+  }
+  const token = crypto.randomBytes(24).toString("hex");
+  fs.writeFileSync(TOKEN_PATH, token, { encoding: "utf8", mode: 0o600 });
+  return token;
+}
+
+export function getLocalToken(): string | null {
+  try {
+    if (!fs.existsSync(TOKEN_PATH)) return null;
+    return fs.readFileSync(TOKEN_PATH, "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export function writePortFile(port: number): void {
+  ensureDir();
+  fs.writeFileSync(PORT_PATH, String(port), "utf8");
+}
+
+export function readPortFile(): number | null {
+  try {
+    if (!fs.existsSync(PORT_PATH)) return null;
+    const n = Number(fs.readFileSync(PORT_PATH, "utf8").trim());
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getProjectRoot(): string {
+  return ROOT;
 }
 
 export function loadStore(): void {

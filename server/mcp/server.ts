@@ -47,7 +47,10 @@ export function createMcpServer(): McpServer {
       },
     },
     async ({ domain }) => {
-      const result = await runGate(domain, getConfig(), "verify_domain");
+      const result = await runGate(domain, getConfig(), {
+        context: "verify_domain",
+        skipVt: true,
+      });
       const official = lookupOfficial(result.hostname);
       const payload = {
         hostname: result.hostname,

@@ -16,7 +16,7 @@ export type VtStatus =
   | "degraded"
   | "error";
 
-export type RdapStatus = "ok" | "skipped" | "error" | "disabled";
+export type RdapStatus = "ok" | "skipped" | "error";
 
 export interface OfficialEntry {
   brand: string;

@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { VirusTotalReport, VtStatus } from "../types.js";
 
 interface CacheEntry {
@@ -5,11 +8,42 @@ interface CacheEntry {
   value: VirusTotalReport;
 }
 
-const cache = new Map<string, CacheEntry>();
-let lastCallAt = 0;
-const MIN_INTERVAL_MS = 16000; // ~4/min free tier safety
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, "..", "..");
+const DISK_CACHE = path.join(ROOT, ".aegis", "vt-cache.json");
 
-function degraded(reason: string): VirusTotalReport {
+const memory = new Map<string, CacheEntry>();
+let lastCallAt = 0;
+let backoffUntil = 0;
+const MIN_INTERVAL_MS = 16000; // ~4/min free-tier safety
+
+function loadDisk(): void {
+  try {
+    if (!fs.existsSync(DISK_CACHE)) return;
+    const raw = JSON.parse(fs.readFileSync(DISK_CACHE, "utf8")) as Record<
+      string,
+      CacheEntry
+    >;
+    for (const [k, v] of Object.entries(raw)) memory.set(k, v);
+  } catch {
+    /* ignore corrupt cache */
+  }
+}
+
+function persistDisk(): void {
+  try {
+    fs.mkdirSync(path.dirname(DISK_CACHE), { recursive: true });
+    const obj: Record<string, CacheEntry> = {};
+    for (const [k, v] of memory.entries()) obj[k] = v;
+    fs.writeFileSync(DISK_CACHE, JSON.stringify(obj), "utf8");
+  } catch {
+    /* non-fatal */
+  }
+}
+
+loadDisk();
+
+function degraded(): VirusTotalReport {
   return {
     status: "degraded",
     malicious: 0,
@@ -31,7 +65,7 @@ function mapStats(stats: {
 }): VtStatus {
   const mal = stats.malicious ?? 0;
   const sus = stats.suspicious ?? 0;
-  if (mal >= 3) return "malicious";
+  // Fail closed: any malicious engine blocks; multiple suspicious → malicious.
   if (mal >= 1 || sus >= 3) return "malicious";
   if (sus >= 1) return "suspicious";
   if ((stats.harmless ?? 0) + (stats.undetected ?? 0) > 0) return "clean";
@@ -44,23 +78,26 @@ export async function lookupDomainVt(
   ttlMs = 6 * 60 * 60 * 1000,
 ): Promise<VirusTotalReport> {
   const host = domain.toLowerCase().replace(/\.$/, "");
-  const cached = cache.get(host);
+  const cached = memory.get(host);
   if (cached && Date.now() - cached.at < ttlMs) {
     return { ...cached.value, cached: true };
   }
 
   if (!apiKey) {
-    const value = degraded("no_api_key");
-    return value;
+    return degraded();
   }
 
-  const wait = MIN_INTERVAL_MS - (Date.now() - lastCallAt);
-  if (wait > 0) {
-    await new Promise((r) => setTimeout(r, Math.min(wait, 2000)));
+  const now = Date.now();
+  if (now < backoffUntil) {
+    return degraded();
   }
-  lastCallAt = Date.now();
+  const wait = MIN_INTERVAL_MS - (now - lastCallAt);
+  if (wait > 0) {
+    await new Promise((r) => setTimeout(r, wait));
+  }
 
   try {
+    lastCallAt = Date.now();
     const res = await fetch(
       `https://www.virustotal.com/api/v3/domains/${encodeURIComponent(host)}`,
       {
@@ -79,14 +116,16 @@ export async function lookupDomainVt(
         cached: false,
         permalink: `https://www.virustotal.com/gui/domain/${host}`,
       };
-      cache.set(host, { at: Date.now(), value });
+      memory.set(host, { at: Date.now(), value });
+      persistDisk();
       return value;
     }
+    if (res.status === 429) {
+      backoffUntil = Date.now() + 60_000;
+      return degraded();
+    }
     if (!res.ok) {
-      return {
-        ...degraded(`http_${res.status}`),
-        status: res.status === 429 ? "degraded" : "error",
-      };
+      return { ...degraded(), status: "error" };
     }
     const body = (await res.json()) as {
       data?: {
@@ -119,22 +158,28 @@ export async function lookupDomainVt(
       cached: false,
       permalink: `https://www.virustotal.com/gui/domain/${host}`,
     };
-    cache.set(host, { at: Date.now(), value });
+    memory.set(host, { at: Date.now(), value });
+    persistDisk();
     return value;
   } catch {
-    return degraded("network_error");
+    return degraded();
   }
 }
 
 export function clearVtCache(): void {
-  cache.clear();
+  memory.clear();
+  try {
+    if (fs.existsSync(DISK_CACHE)) fs.unlinkSync(DISK_CACHE);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function vtCacheSize(): number {
-  return cache.size;
+  return memory.size;
 }
 
 /** Test helper: inject a report without network. */
 export function primeVtCache(domain: string, value: VirusTotalReport): void {
-  cache.set(domain.toLowerCase(), { at: Date.now(), value });
+  memory.set(domain.toLowerCase(), { at: Date.now(), value });
 }

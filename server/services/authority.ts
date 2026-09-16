@@ -112,6 +112,12 @@ export async function buildAuthority(
       severity: "info",
       message: "RDAP lookup unavailable; relying on static authority checks.",
     });
+  } else if (rdap.status === "skipped") {
+    reasons.push({
+      code: "rdap_skipped",
+      severity: "info",
+      message: "RDAP lookup skipped.",
+    });
   }
 
   const report: AuthorityReport = {

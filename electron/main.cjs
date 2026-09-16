@@ -1,23 +1,54 @@
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
+const fs = require("fs");
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 let mainWindow = null;
 let serverProc = null;
 let apiPort = 7832;
 
+const PORT_FILE = path.join(__dirname, "..", ".aegis", "port");
+
+function readPortFile() {
+  try {
+    if (!fs.existsSync(PORT_FILE)) return null;
+    const n = Number(fs.readFileSync(PORT_FILE, "utf8").trim());
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function waitForPort(timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      const p = readPortFile();
+      if (p) {
+        resolve(p);
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        resolve(7832);
+        return;
+      }
+      setTimeout(tick, 150);
+    };
+    tick();
+  });
+}
+
 function startCoreServer() {
   return new Promise((resolve, reject) => {
     if (isDev) {
-      // Dev: user runs `npm run dev:server` separately via concurrently
-      resolve(7832);
+      // Dev: concurrently starts server; port file may already exist
+      const existing = readPortFile();
+      resolve(existing ?? 7832);
       return;
     }
     const serverEntry = path.join(__dirname, "..", "server", "index.ts");
-    // Prefer compiled JS if present, else tsx
     const distEntry = path.join(__dirname, "..", "dist-server", "index.js");
-    const fs = require("fs");
     if (fs.existsSync(distEntry)) {
       serverProc = spawn(process.execPath, [distEntry], {
         stdio: "inherit",
@@ -31,8 +62,7 @@ function startCoreServer() {
       });
     }
     serverProc.on("error", reject);
-    // Give the server a moment; UI polls health
-    setTimeout(() => resolve(7832), 800);
+    waitForPort().then(resolve);
   });
 }
 
@@ -51,13 +81,15 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      additionalArguments: [`--aegis-api-port=${apiPort}`],
     },
   });
 
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
+    // Same-origin with API (express serves dist/) so CORS/Origin stay clean.
+    mainWindow.loadURL(`http://127.0.0.1:${apiPort}/`);
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

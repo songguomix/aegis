@@ -34,7 +34,8 @@ export async function fetchRdap(
   enabled = true,
 ): Promise<RdapResult> {
   if (!enabled) {
-    return { status: "disabled", registrant: null, organization: null };
+    // Spec-facing status is "skipped" when lookup is intentionally off.
+    return { status: "skipped", registrant: null, organization: null };
   }
   const host = hostname.toLowerCase().replace(/\.$/, "");
   const hit = cache.get(host);

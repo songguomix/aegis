@@ -4,7 +4,20 @@ import { fileURLToPath } from "node:url";
 import type { OfficialEntry } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_PATH = path.join(__dirname, "..", "data", "official-domains.json");
+
+function resolveDataPath(): string {
+  const candidates = [
+    path.join(__dirname, "..", "data", "official-domains.json"), // server/services → server/data
+    path.join(__dirname, "..", "..", "server", "data", "official-domains.json"), // dist-server fallback
+    path.join(__dirname, "..", "..", "..", "server", "data", "official-domains.json"),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return candidates[0];
+}
+
+const DATA_PATH = resolveDataPath();
 
 let cache: Record<string, OfficialEntry> | null = null;
 

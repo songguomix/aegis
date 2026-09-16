@@ -73,7 +73,7 @@ function createWindow() {
     minWidth: 920,
     minHeight: 620,
     title: "Aegis",
-    backgroundColor: "#070b14",
+    backgroundColor: "#ffffff",
     vibrancy: "under-window",
     visualEffectState: "active",
     transparent: false,

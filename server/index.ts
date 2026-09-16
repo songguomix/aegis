@@ -1,6 +1,7 @@
 import express from "express";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createApiRouter } from "./routes/api.js";
 import { loadStore, getConfig, getLocalToken, ensureToken, writePortFile } from "./services/store.js";
 import { startMcpStdio } from "./mcp/server.js";
@@ -70,7 +71,7 @@ export function createApp(): express.Express {
   app.use("/api/v1", createApiRouter());
 
   // Production console is same-origin with the API (avoids file:// Origin: null).
-  const distUi = new URL("../dist/", import.meta.url).pathname;
+  const distUi = fileURLToPath(new URL("../dist/", import.meta.url));
   if (existsSync(distUi)) {
     app.use(express.static(distUi));
     app.get("*", (req, res, next) => {

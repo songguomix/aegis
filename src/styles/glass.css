@@ -660,6 +660,7 @@ select.input {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   background: #fff;
@@ -673,7 +674,30 @@ select.input {
   color: var(--text-3);
   font-size: 11px;
   margin-right: auto;
-  margin-left: 12px;
+  margin-left: 0;
+  flex: 1 1 120px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.help {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+  word-break: break-word;
+}
+
+.note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel-muted);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+  word-break: break-word;
 }
 
 .code {
@@ -730,8 +754,8 @@ textarea.input::selection {
 
 .tool-list li {
   display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 8px 16px;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+  gap: 6px 14px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   font-size: 12.5px;
@@ -745,9 +769,11 @@ textarea.input::selection {
 
 .tool-list code {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text);
+  word-break: break-all;
+  line-height: 1.45;
 }
 
 .tool-list em {
@@ -755,10 +781,24 @@ textarea.input::selection {
   font-style: normal;
   color: var(--text-3);
   font-size: 11.5px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.tool-list li > span {
+  min-width: 0;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+/* endpoint rows: path on left can be wider */
+.tool-list.endpoints li {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
 }
 
 @media (max-width: 720px) {
-  .tool-list li {
+  .tool-list li,
+  .tool-list.endpoints li {
     grid-template-columns: 1fr;
   }
   .tool-list em {

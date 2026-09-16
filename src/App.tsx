@@ -931,7 +931,7 @@ export default function App() {
                 <div className="panel-head">
                   <h3>{L("mcpSection")}</h3>
                 </div>
-                <p className="help" style={{ marginTop: 0 }}>
+                <p className="help" style={{ marginTop: 8 }}>
                   {L("mcpSub")}
                 </p>
 
@@ -981,8 +981,8 @@ export default function App() {
                   >
                     {integration?.mcpCommand ?? "node … --mcp"}
                   </pre>
-                  <p className="help">{L("runMcpHelp")}</p>
                 </div>
+                <p className="help">{L("runMcpHelp")}</p>
 
                 <div className="panel-head" style={{ marginTop: 16 }}>
                   <h3>{L("mcpTools")}</h3>
@@ -999,7 +999,7 @@ export default function App() {
                   ))}
                   {integration?.tools == null && <li className="empty">…</li>}
                 </ul>
-                <p className="help">{L("replacePathNote")}</p>
+                <p className="note">{L("replacePathNote")}</p>
               </section>
 
               <section className="panel">
@@ -1039,18 +1039,22 @@ export default function App() {
                       : "curl -sS http://127.0.0.1:7832/api/v1/check -H 'content-type: application/json' -d '{\"url\":\"https://example.com\"}'"}
                   </pre>
                 </div>
-                <ul className="tool-list" style={{ marginTop: 12 }}>
-                  <li>
-                    <code>{integration?.http.base ?? "http://127.0.0.1:7832/api/v1"}</code>
-                    <span>API base</span>
-                  </li>
+                <ul className="tool-list endpoints" style={{ marginTop: 12 }}>
                   <li>
                     <code>{integration?.http.checkUrl ?? "/check"}</code>
-                    <span>POST URL / host check</span>
+                    <span>POST · check URL / host</span>
                   </li>
                   <li>
                     <code>{integration?.http.statusUrl ?? "/health"}</code>
-                    <span>GET engine health</span>
+                    <span>GET · engine health</span>
+                  </li>
+                  <li>
+                    <code>{`${integration?.http.base ?? "http://127.0.0.1:7832/api/v1"}/check-file`}</code>
+                    <span>POST · file hash</span>
+                  </li>
+                  <li>
+                    <code>{`${integration?.http.base ?? "http://127.0.0.1:7832/api/v1"}/check-batch`}</code>
+                    <span>POST · batch URLs</span>
                   </li>
                 </ul>
               </section>

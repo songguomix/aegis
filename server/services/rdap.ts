@@ -34,55 +34,57 @@ export async function fetchRdap(
   enabled = true,
 ): Promise<RdapResult> {
   if (!enabled) {
-    // Spec-facing status is "skipped" when lookup is intentionally off.
     return { status: "skipped", registrant: null, organization: null };
   }
   const host = hostname.toLowerCase().replace(/\.$/, "");
   const hit = cache.get(host);
   if (hit && Date.now() - hit.at < TTL) return hit.value;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(host)}`, {
-      signal: controller.signal,
-      headers: { Accept: "application/rdap+json, application/json" },
-    });
-    if (!res.ok) {
+  const urls: string[] = [`https://rdap.org/domain/${encodeURIComponent(host)}`];
+  if (host.endsWith(".com") || host.endsWith(".net")) {
+    urls.push(`https://rdap.verisign.com/com/v1/domain/${encodeURIComponent(host)}`);
+  }
+  if (host.endsWith(".org")) {
+    urls.push(`https://rdap.publicinterestregistry.org/rdap/domain/${encodeURIComponent(host)}`);
+  }
+
+  for (const url of urls) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: "application/rdap+json, application/json" },
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as {
+        entities?: Array<Record<string, unknown>>;
+      };
+      const entities = data.entities ?? [];
+      const registrant =
+        entities.find((e) => (e.roles as string[] | undefined)?.includes("registrant")) ??
+        entities[0];
       const value: RdapResult = {
-        status: "error",
-        registrant: null,
-        organization: null,
+        status: "ok",
+        registrant: registrant ? pickName(registrant) : null,
+        organization: registrant ? extractOrg(registrant) : null,
       };
       cache.set(host, { at: Date.now(), value });
       return value;
+    } catch {
+      /* try next endpoint */
+    } finally {
+      clearTimeout(timer);
     }
-    const data = (await res.json()) as {
-      entities?: Array<Record<string, unknown>>;
-      status?: string[];
-    };
-    const entities = data.entities ?? [];
-    const registrant =
-      entities.find((e) => (e.roles as string[] | undefined)?.includes("registrant")) ??
-      entities[0];
-    const value: RdapResult = {
-      status: "ok",
-      registrant: registrant ? pickName(registrant) : null,
-      organization: registrant ? extractOrg(registrant) : null,
-    };
-    cache.set(host, { at: Date.now(), value });
-    return value;
-  } catch {
-    const value: RdapResult = {
-      status: "error",
-      registrant: null,
-      organization: null,
-    };
-    cache.set(host, { at: Date.now(), value });
-    return value;
-  } finally {
-    clearTimeout(timer);
   }
+
+  const value: RdapResult = {
+    status: "error",
+    registrant: null,
+    organization: null,
+  };
+  cache.set(host, { at: Date.now(), value });
+  return value;
 }
 
 export function clearRdapCache(): void {

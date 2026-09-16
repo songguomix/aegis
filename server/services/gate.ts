@@ -180,11 +180,18 @@ export async function runGate(
       severity: "info",
       message: `Free intel clean (URLhaus / ThreatFox / OpenPhish)${intel.cached ? ", cached" : ""}.`,
     });
+  } else if (intel.status === "unknown") {
+    reasons.push({
+      code: "threat_intel_partial",
+      severity: "info",
+      message:
+        "Some free intel feeds unavailable; remaining sources found no list. Not treated as full clean.",
+    });
   } else if (intel.status === "error") {
     reasons.push({
       code: "threat_intel_error",
       severity: "info",
-      message: "Free threat intel sources unavailable; relying on authority + VirusTotal.",
+      message: "Free threat intel feeds unavailable; relying on authority + VirusTotal.",
     });
   }
 

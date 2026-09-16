@@ -16,6 +16,7 @@ import {
 } from "../services/store.js";
 import { brandKeys, lookupOfficial } from "../services/registry.js";
 import { vtCacheSize } from "../services/virustotal.js";
+import { intelFeedStatus } from "../services/threatIntel.js";
 
 const checkSchema = z.object({
   url: z.string().min(1),
@@ -51,6 +52,7 @@ export function createApiRouter(): express.Router {
       version: "0.1.0",
       stats: stats(),
       vtCache: vtCacheSize(),
+      intelFeeds: intelFeedStatus(),
       policyMode: getConfig().policyMode,
     });
   });

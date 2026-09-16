@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "aegis": {
+      "command": "npx",
+      "args": [
+        "tsx",
+        "/Users/pinecones/Desktop/Cybersecurity For AI Agents/server/index.ts",
+        "--mcp"
+      ]
+    }
+  }
+}

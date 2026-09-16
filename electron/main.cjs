@@ -128,10 +128,10 @@ async function startCoreServer() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 780,
-    minWidth: 920,
-    minHeight: 620,
+    width: 1200,
+    height: 800,
+    minWidth: 960,
+    minHeight: 640,
     title: "Aegis",
     backgroundColor: "#eef2f7",
     vibrancy: "under-window",

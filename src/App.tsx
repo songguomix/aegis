@@ -115,23 +115,26 @@ export default function App() {
           ) : (
             <span className="badge degraded">● {L("modeDegraded")}</span>
           )}
-          <div style={{ marginTop: 10 }}>
-            v0.1.0 · MCP + HTTP
-          </div>
+          <div className="ver">v0.1.0 · MCP + HTTP</div>
         </div>
       </aside>
 
       <main className="main">
+        <div className="main-inner">
         {tab === "dashboard" && (
           <>
             <div className="page-header">
               <div>
                 <h2>{L("dashboard")}</h2>
-                <p className="sub">{L("status")}: Aegis core · policy {health?.policyMode ?? "—"}</p>
+                <p className="sub">
+                  {L("status")}: Aegis core · policy {health?.policyMode ?? "—"}
+                </p>
               </div>
-              <button className="btn" onClick={() => setTab("check")}>
-                {L("liveCheck")}
-              </button>
+              <div className="actions">
+                <button className="btn" onClick={() => setTab("check")}>
+                  {L("liveCheck")}
+                </button>
+              </div>
             </div>
 
             <div className="stats">
@@ -156,7 +159,9 @@ export default function App() {
 
             <div className="grid-2">
               <section className="glass panel">
-                <h3>{L("recent")}</h3>
+                <div className="panel-head">
+                  <h3>{L("recent")}</h3>
+                </div>
                 {recent.length === 0 ? (
                   <div className="empty">{L("noResults")}</div>
                 ) : (
@@ -186,7 +191,9 @@ export default function App() {
               </section>
 
               <section className="glass panel">
-                <h3>{L("checkTitle")}</h3>
+                <div className="panel-head">
+                  <h3>{L("checkTitle")}</h3>
+                </div>
                 <div className="check-row">
                   <div className="field">
                     <input
@@ -201,33 +208,31 @@ export default function App() {
                     {loading ? L("checking") : L("runCheck")}
                   </button>
                 </div>
-                {result && (
-                  <div className="glass-soft result-card">
-                    <div className="result-head">
+                {result ? (
+                  <div className="glass-soft result-card" style={{ marginTop: 16 }}>
+                    <div className="result-head" style={{ marginBottom: 12, paddingBottom: 12 }}>
                       <div className="url mono">{result.hostname}</div>
                       <div className="split">
                         <div className="score-ring">{result.score}</div>
                         <DecisionPill decision={result.decision} />
                       </div>
                     </div>
-                    <div className="meta-grid">
+                    <div className="meta-grid cols-2">
                       <div className="glass-soft meta-item">
                         <div className="k">{L("official")}</div>
                         <div className="v">
-                          {result.authority.official
-                            ? result.authority.brand
-                            : "—"}
+                          {result.authority.official ? result.authority.brand : "—"}
                         </div>
-                      </div>
-                      <div className="glass-soft meta-item">
-                        <div className="k">{L("subject")}</div>
-                        <div className="v">{result.authority.subject ?? "—"}</div>
                       </div>
                       <div className="glass-soft meta-item">
                         <div className="k">{L("vt")}</div>
                         <div className="v">{result.virusTotal.status}</div>
                       </div>
                     </div>
+                  </div>
+                ) : (
+                  <div className="empty" style={{ padding: "28px 8px" }}>
+                    Paste a URL to verify before the agent continues
                   </div>
                 )}
               </section>
@@ -243,10 +248,9 @@ export default function App() {
                 <p className="sub">{L("checkSub")}</p>
               </div>
             </div>
-            <section className="glass panel">
-              <div className="form-stack">
+            <section className="glass panel check-hero">
+              <div className="check-row">
                 <div className="field">
-                  <label>URL</label>
                   <input
                     className="input"
                     placeholder={L("urlPlaceholder")}
@@ -255,88 +259,87 @@ export default function App() {
                     onKeyDown={(e) => e.key === "Enter" && runCheck()}
                   />
                 </div>
-                <div className="field">
-                  <label>Context</label>
-                  <input
-                    className="input"
-                    placeholder={L("contextPlaceholder")}
-                    value={context}
-                    onChange={(e) => setContext(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <button className="btn" onClick={runCheck} disabled={loading || !url.trim()}>
-                    {loading ? L("checking") : L("runCheck")}
-                  </button>
-                </div>
+                <button className="btn" onClick={runCheck} disabled={loading || !url.trim()}>
+                  {loading ? L("checking") : L("runCheck")}
+                </button>
               </div>
+              <div className="field" style={{ marginTop: 14 }}>
+                <input
+                  className="input"
+                  placeholder={L("contextPlaceholder")}
+                  value={context}
+                  onChange={(e) => setContext(e.target.value)}
+                />
+              </div>
+            </section>
 
-              {result && (
-                <div className="glass-soft result-card">
-                  <div className="result-head">
-                    <div>
-                      <div className="url">{result.url}</div>
-                      <div className="sub mono" style={{ color: "var(--text-dim)", marginTop: 4 }}>
-                        {result.hostname} · {new Date(result.checkedAt).toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="split">
-                      <div className="score-ring">{result.score}</div>
-                      <DecisionPill decision={result.decision} />
+            {result && (
+              <section className="glass result-card">
+                <div className="result-head">
+                  <div>
+                    <div className="url">{result.url}</div>
+                    <div className="sub mono">
+                      {result.hostname} · {new Date(result.checkedAt).toLocaleString()}
                     </div>
                   </div>
-
-                  <div className="meta-grid">
-                    <div className="glass-soft meta-item">
-                      <div className="k">{L("brand")}</div>
-                      <div className="v">{result.authority.brand ?? "—"}</div>
-                    </div>
-                    <div className="glass-soft meta-item">
-                      <div className="k">{L("subject")}</div>
-                      <div className="v">{result.authority.subject ?? "—"}</div>
-                    </div>
-                    <div className="glass-soft meta-item">
-                      <div className="k">{L("rdap")}</div>
-                      <div className="v">
-                        {result.authority.rdap.status}
-                        {result.authority.rdap.organization
-                          ? ` · ${result.authority.rdap.organization}`
-                          : ""}
-                      </div>
-                    </div>
-                    <div className="glass-soft meta-item">
-                      <div className="k">{L("vt")}</div>
-                      <div className="v">
-                        {result.virusTotal.status} · mal {result.virusTotal.malicious} ·
-                        sus {result.virusTotal.suspicious}
-                        {result.virusTotal.cached ? " · cached" : ""}
-                      </div>
-                    </div>
-                    <div className="glass-soft meta-item">
-                      <div className="k">{L("lookalike")}</div>
-                      <div className="v">{result.authority.lookalikeOf ?? "—"}</div>
-                    </div>
-                    <div className="glass-soft meta-item">
-                      <div className="k">{L("official")}</div>
-                      <div className="v">
-                        {result.authority.official ? "yes" : "no"}
-                        {result.authority.punycode ? " · punycode" : ""}
-                      </div>
-                    </div>
-                  </div>
-
-                  <h3 style={{ marginTop: 8 }}>{L("reasons")}</h3>
-                  <div className="reasons">
-                    {result.reasons.map((r, i) => (
-                      <div className="reason" key={`${r.code}-${i}`}>
-                        <span className={`sev ${r.severity}`}>{r.severity}</span>
-                        <span>{r.message}</span>
-                      </div>
-                    ))}
+                  <div className="split">
+                    <div className="score-ring">{result.score}</div>
+                    <DecisionPill decision={result.decision} />
                   </div>
                 </div>
-              )}
-            </section>
+
+                <div className="meta-grid">
+                  <div className="glass-soft meta-item">
+                    <div className="k">{L("brand")}</div>
+                    <div className="v">{result.authority.brand ?? "—"}</div>
+                  </div>
+                  <div className="glass-soft meta-item">
+                    <div className="k">{L("subject")}</div>
+                    <div className="v">{result.authority.subject ?? "—"}</div>
+                  </div>
+                  <div className="glass-soft meta-item">
+                    <div className="k">{L("rdap")}</div>
+                    <div className="v">
+                      {result.authority.rdap.status}
+                      {result.authority.rdap.organization
+                        ? ` · ${result.authority.rdap.organization}`
+                        : ""}
+                    </div>
+                  </div>
+                  <div className="glass-soft meta-item">
+                    <div className="k">{L("vt")}</div>
+                    <div className="v">
+                      {result.virusTotal.status} · mal {result.virusTotal.malicious} · sus{" "}
+                      {result.virusTotal.suspicious}
+                      {result.virusTotal.cached ? " · cached" : ""}
+                    </div>
+                  </div>
+                  <div className="glass-soft meta-item">
+                    <div className="k">{L("lookalike")}</div>
+                    <div className="v">{result.authority.lookalikeOf ?? "—"}</div>
+                  </div>
+                  <div className="glass-soft meta-item">
+                    <div className="k">{L("official")}</div>
+                    <div className="v">
+                      {result.authority.official ? "yes" : "no"}
+                      {result.authority.punycode ? " · punycode" : ""}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel-head">
+                  <h3>{L("reasons")}</h3>
+                </div>
+                <div className="reasons">
+                  {result.reasons.map((r, i) => (
+                    <div className="reason" key={`${r.code}-${i}`}>
+                      <span className={`sev ${r.severity}`}>{r.severity}</span>
+                      <span>{r.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </>
         )}
 
@@ -347,22 +350,24 @@ export default function App() {
                 <h2>{L("history")}</h2>
                 <p className="sub">{history.length} records</p>
               </div>
-              <button
-                className="btn btn-ghost"
-                onClick={async () => {
-                  await api.clearHistory();
-                  await refresh();
-                  setToast(L("historyCleared"));
-                }}
-              >
-                {L("clearHistory")}
-              </button>
+              <div className="actions">
+                <button
+                  className="btn btn-ghost"
+                  onClick={async () => {
+                    await api.clearHistory();
+                    await refresh();
+                    setToast(L("historyCleared"));
+                  }}
+                >
+                  {L("clearHistory")}
+                </button>
+              </div>
             </div>
             <section className="glass panel">
               {history.length === 0 ? (
                 <div className="empty">{L("noResults")}</div>
               ) : (
-                <div className="list-scroll" style={{ maxHeight: "65vh" }}>
+                <div className="history-scroll">
                   <table className="table">
                     <thead>
                       <tr>
@@ -421,43 +426,45 @@ export default function App() {
                   <div className="help">{L("vtKeyHelp")}</div>
                 </div>
 
-                <div className="form-row">
-                  <label>{L("policy")}</label>
-                  <select
-                    className="input"
-                    value={config.policyMode}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        policyMode: e.target.value as EngineConfigView["policyMode"],
-                      })
-                    }
-                  >
-                    <option value="tri">{L("policyTri")}</option>
-                    <option value="strict">{L("policyStrict")}</option>
-                    <option value="observe">{L("policyObserve")}</option>
-                  </select>
-                </div>
+                <div className="form-grid-2">
+                  <div className="form-row">
+                    <label>{L("policy")}</label>
+                    <select
+                      className="input"
+                      value={config.policyMode}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          policyMode: e.target.value as EngineConfigView["policyMode"],
+                        })
+                      }
+                    >
+                      <option value="tri">{L("policyTri")}</option>
+                      <option value="strict">{L("policyStrict")}</option>
+                      <option value="observe">{L("policyObserve")}</option>
+                    </select>
+                  </div>
 
-                <div className="form-row">
-                  <label>{L("language")}</label>
-                  <select
-                    className="input"
-                    value={config.language}
-                    onChange={(e) => {
-                      const language = e.target.value as Lang;
-                      setConfig({ ...config, language });
-                      setLang(language);
-                    }}
-                  >
-                    <option value="en">English</option>
-                    <option value="zh">中文</option>
-                  </select>
+                  <div className="form-row">
+                    <label>{L("language")}</label>
+                    <select
+                      className="input"
+                      value={config.language}
+                      onChange={(e) => {
+                        const language = e.target.value as Lang;
+                        setConfig({ ...config, language });
+                        setLang(language);
+                      }}
+                    >
+                      <option value="en">English</option>
+                      <option value="zh">中文</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="glass-soft toggle-row">
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{L("enableRdap")}</div>
+                    <div className="title">{L("enableRdap")}</div>
                     <div className="help" style={{ marginTop: 4 }}>
                       {L("enableRdapHelp")}
                     </div>
@@ -465,51 +472,51 @@ export default function App() {
                   <button
                     className={`switch ${config.enableRdap ? "on" : ""}`}
                     aria-label="RDAP"
-                    onClick={() =>
-                      setConfig({ ...config, enableRdap: !config.enableRdap })
-                    }
+                    onClick={() => setConfig({ ...config, enableRdap: !config.enableRdap })}
                   />
                 </div>
 
-                <div className="form-row">
-                  <label>{L("allowlist")}</label>
-                  <textarea
-                    className="input"
-                    rows={4}
-                    value={config.allowlist.join("\n")}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        allowlist: e.target.value
-                          .split("\n")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                  <div className="help">{L("allowlistHelp")}</div>
+                <div className="form-grid-2">
+                  <div className="form-row">
+                    <label>{L("allowlist")}</label>
+                    <textarea
+                      className="input"
+                      rows={5}
+                      value={config.allowlist.join("\n")}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          allowlist: e.target.value
+                            .split("\n")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                    />
+                    <div className="help">{L("allowlistHelp")}</div>
+                  </div>
+
+                  <div className="form-row">
+                    <label>{L("denylist")}</label>
+                    <textarea
+                      className="input"
+                      rows={5}
+                      value={config.denylist.join("\n")}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          denylist: e.target.value
+                            .split("\n")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                    />
+                    <div className="help">{L("denylistHelp")}</div>
+                  </div>
                 </div>
 
-                <div className="form-row">
-                  <label>{L("denylist")}</label>
-                  <textarea
-                    className="input"
-                    rows={4}
-                    value={config.denylist.join("\n")}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        denylist: e.target.value
-                          .split("\n")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                  <div className="help">{L("denylistHelp")}</div>
-                </div>
-
-                <div>
+                <div className="form-actions">
                   <button
                     className="btn"
                     onClick={() =>
@@ -530,6 +537,7 @@ export default function App() {
             </section>
           </>
         )}
+        </div>
 
         {error && (
           <div className="glass toast" style={{ color: "var(--rose)" }}>

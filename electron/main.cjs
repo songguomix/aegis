@@ -133,7 +133,10 @@ function createWindow() {
     minWidth: 920,
     minHeight: 620,
     title: "Aegis",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#eef2f7",
+    vibrancy: "under-window",
+    visualEffectState: "active",
+    transparent: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),

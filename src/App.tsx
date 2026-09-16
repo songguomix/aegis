@@ -85,7 +85,6 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">A</div>
           <div>
             <h1>Aegis</h1>
             <p>{L("brandTag")}</p>
@@ -120,7 +119,7 @@ export default function App() {
       </aside>
 
       <main className="main">
-        <div className="main-inner">
+        <div className={`main-inner${tab === "settings" || tab === "history" ? " wide" : ""}`}>
         {tab === "dashboard" && (
           <>
             <div className="page-header">
@@ -419,131 +418,143 @@ export default function App() {
                 <p className="sub">{L("settingsSub")}</p>
               </div>
             </div>
-            <section className="panel">
-              <div className="form-stack">
-                <div className="form-row">
-                  <label>{L("vtKey")}</label>
-                  <input
-                    className="input"
-                    type="password"
-                    placeholder={config.hasVtKey ? "••••••••" : "VT API key"}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setConfig({ ...config, vtApiKey: v || null, hasVtKey: Boolean(v) });
-                    }}
-                  />
-                  <div className="help">{L("vtKeyHelp")}</div>
+            <div className="settings-layout">
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>{L("vtKey")}</h3>
                 </div>
-
-                <div className="form-grid-2">
+                <div className="form-stack full">
                   <div className="form-row">
-                    <label>{L("policy")}</label>
-                    <select
+                    <label>{L("vtKey")}</label>
+                    <input
                       className="input"
-                      value={config.policyMode}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          policyMode: e.target.value as EngineConfigView["policyMode"],
-                        })
-                      }
-                    >
-                      <option value="tri">{L("policyTri")}</option>
-                      <option value="strict">{L("policyStrict")}</option>
-                      <option value="observe">{L("policyObserve")}</option>
-                    </select>
-                  </div>
-
-                  <div className="form-row">
-                    <label>{L("language")}</label>
-                    <select
-                      className="input"
-                      value={config.language}
+                      type="password"
+                      placeholder={config.hasVtKey ? "••••••••" : "VT API key"}
                       onChange={(e) => {
-                        const language = e.target.value as Lang;
-                        setConfig({ ...config, language });
-                        setLang(language);
+                        const v = e.target.value;
+                        setConfig({ ...config, vtApiKey: v || null, hasVtKey: Boolean(v) });
                       }}
-                    >
-                      <option value="en">English</option>
-                      <option value="zh">中文</option>
-                    </select>
+                    />
+                    <div className="help">{L("vtKeyHelp")}</div>
                   </div>
-                </div>
 
-                <div className="toggle-row">
-                  <div>
-                    <div className="title">{L("enableRdap")}</div>
-                    <div className="help" style={{ marginTop: 4 }}>
-                      {L("enableRdapHelp")}
+                  <div className="form-grid-2">
+                    <div className="form-row">
+                      <label>{L("policy")}</label>
+                      <select
+                        className="input"
+                        value={config.policyMode}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            policyMode: e.target.value as EngineConfigView["policyMode"],
+                          })
+                        }
+                      >
+                        <option value="tri">{L("policyTri")}</option>
+                        <option value="strict">{L("policyStrict")}</option>
+                        <option value="observe">{L("policyObserve")}</option>
+                      </select>
+                    </div>
+
+                    <div className="form-row">
+                      <label>{L("language")}</label>
+                      <select
+                        className="input"
+                        value={config.language}
+                        onChange={(e) => {
+                          const language = e.target.value as Lang;
+                          setConfig({ ...config, language });
+                          setLang(language);
+                        }}
+                      >
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                      </select>
                     </div>
                   </div>
-                  <button
-                    className={`switch ${config.enableRdap ? "on" : ""}`}
-                    aria-label="RDAP"
-                    onClick={() => setConfig({ ...config, enableRdap: !config.enableRdap })}
-                  />
-                </div>
 
-                <div className="form-grid-2">
-                  <div className="form-row">
-                    <label>{L("allowlist")}</label>
-                    <textarea
-                      className="input"
-                      rows={5}
-                      value={config.allowlist.join("\n")}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          allowlist: e.target.value
-                            .split("\n")
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                        })
-                      }
+                  <div className="toggle-row">
+                    <div>
+                      <div className="title">{L("enableRdap")}</div>
+                      <div className="help" style={{ marginTop: 4 }}>
+                        {L("enableRdapHelp")}
+                      </div>
+                    </div>
+                    <button
+                      className={`switch ${config.enableRdap ? "on" : ""}`}
+                      aria-label="RDAP"
+                      onClick={() => setConfig({ ...config, enableRdap: !config.enableRdap })}
                     />
-                    <div className="help">{L("allowlistHelp")}</div>
                   </div>
 
-                  <div className="form-row">
-                    <label>{L("denylist")}</label>
-                    <textarea
-                      className="input"
-                      rows={5}
-                      value={config.denylist.join("\n")}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          denylist: e.target.value
-                            .split("\n")
-                            .map((s) => s.trim())
-                            .filter(Boolean),
+                  <div className="form-actions">
+                    <button
+                      className="btn"
+                      onClick={() =>
+                        saveSettings({
+                          vtApiKey: config.vtApiKey,
+                          policyMode: config.policyMode,
+                          language: config.language,
+                          enableRdap: config.enableRdap,
+                          allowlist: config.allowlist,
+                          denylist: config.denylist,
                         })
                       }
-                    />
-                    <div className="help">{L("denylistHelp")}</div>
+                    >
+                      {L("save")}
+                    </button>
                   </div>
                 </div>
+              </section>
 
-                <div className="form-actions">
-                  <button
-                    className="btn"
-                    onClick={() =>
-                      saveSettings({
-                        vtApiKey: config.vtApiKey,
-                        policyMode: config.policyMode,
-                        language: config.language,
-                        enableRdap: config.enableRdap,
-                        allowlist: config.allowlist,
-                        denylist: config.denylist,
-                      })
-                    }
-                  >
-                    {L("save")}
-                  </button>
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>Lists</h3>
                 </div>
-              </div>
-            </section>
+                <div className="form-stack full">
+                  <div className="form-grid-2">
+                    <div className="form-row">
+                      <label>{L("allowlist")}</label>
+                      <textarea
+                        className="input"
+                        rows={9}
+                        value={config.allowlist.join("\n")}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            allowlist: e.target.value
+                              .split("\n")
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
+                      <div className="help">{L("allowlistHelp")}</div>
+                    </div>
+
+                    <div className="form-row">
+                      <label>{L("denylist")}</label>
+                      <textarea
+                        className="input"
+                        rows={9}
+                        value={config.denylist.join("\n")}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            denylist: e.target.value
+                              .split("\n")
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
+                      <div className="help">{L("denylistHelp")}</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
           </>
         )}
         </div>

@@ -17,6 +17,104 @@ function DecisionPill({ decision }: { decision: GateResult["decision"] }) {
   return <span className={`decision-pill ${decision}`}>{decision}</span>;
 }
 
+function SourceRow({
+  name,
+  status,
+  detail,
+  level,
+}: {
+  name: string;
+  status: string;
+  detail?: string;
+  level: "ok" | "warn" | "bad" | "muted";
+}) {
+  return (
+    <div className={`source-row ${level}`}>
+      <span className="source-name">{name}</span>
+      <span className="source-status">{status}</span>
+      {detail ? <span className="source-detail">{detail}</span> : null}
+    </div>
+  );
+}
+
+function DataSources({ result }: { result: GateResult }) {
+  const intel = result.threatIntel;
+  const vt = result.virusTotal;
+  const auth = result.authority;
+
+  const vtLevel: "ok" | "warn" | "bad" | "muted" =
+    vt.status === "malicious"
+      ? "bad"
+      : vt.status === "suspicious"
+        ? "warn"
+        : vt.status === "clean"
+          ? "ok"
+          : "muted";
+
+  return (
+    <div className="sources">
+      <div className="panel-head" style={{ marginBottom: 8 }}>
+        <h3>Data sources</h3>
+      </div>
+      <SourceRow
+        name="Official registry"
+        status={auth.official ? auth.brand ?? "match" : "no match"}
+        detail={auth.subject ?? auth.category ?? undefined}
+        level={auth.official ? "ok" : "muted"}
+      />
+      <SourceRow
+        name="Lookalike"
+        status={auth.lookalikeOf ? "suspicious" : "ok"}
+        detail={auth.lookalikeOf ? `→ ${auth.lookalikeOf}` : undefined}
+        level={auth.lookalikeOf ? "bad" : "ok"}
+      />
+      <SourceRow
+        name="RDAP"
+        status={auth.rdap.status}
+        detail={auth.rdap.organization || auth.rdap.registrant || undefined}
+        level={auth.rdap.status === "ok" ? "ok" : "muted"}
+      />
+      <SourceRow
+        name="VirusTotal"
+        status={vt.status}
+        detail={`mal ${vt.malicious} · sus ${vt.suspicious} · harm ${vt.harmless}${vt.cached ? " · cache" : ""}`}
+        level={vtLevel}
+      />
+      {(intel?.sources ?? []).map((s) => (
+        <SourceRow
+          key={s.source}
+          name={s.source}
+          status={s.listed ? "LISTED" : "clear"}
+          detail={s.detail}
+          level={s.listed ? "bad" : String(s.detail ?? "").includes("fail") || String(s.detail ?? "").startsWith("http_") ? "muted" : "ok"}
+        />
+      ))}
+      {intel && (
+        <SourceRow
+          name="Intel overall"
+          status={intel.status}
+          detail={
+            intel.listedBy.length
+              ? intel.listedBy.join(", ")
+              : intel.status === "unknown"
+                ? "partial feeds"
+                : undefined
+          }
+          level={
+            intel.status === "listed"
+              ? "bad"
+              : intel.status === "clean"
+                ? "ok"
+                : intel.status === "unknown"
+                  ? "warn"
+                  : "muted"
+          }
+        />
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [lang, setLang] = useState<Lang>("en");
@@ -547,56 +645,35 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="meta-grid">
-                  <div className="meta-item">
-                    <div className="k">{L("brand")}</div>
-                    <div className="v">{result.authority.brand ?? "—"}</div>
-                  </div>
-                  <div className="meta-item">
-                    <div className="k">{L("subject")}</div>
-                    <div className="v">{result.authority.subject ?? "—"}</div>
-                  </div>
-                  <div className="meta-item">
-                    <div className="k">{L("rdap")}</div>
-                    <div className="v">
-                      {result.authority.rdap.status}
-                      {result.authority.rdap.organization
-                        ? ` · ${result.authority.rdap.organization}`
-                        : ""}
+                <div className="result-body">
+                  <div className="meta-grid cols-2">
+                    <div className="meta-item">
+                      <div className="k">{L("brand")}</div>
+                      <div className="v">{result.authority.brand ?? "—"}</div>
+                    </div>
+                    <div className="meta-item">
+                      <div className="k">{L("subject")}</div>
+                      <div className="v">{result.authority.subject ?? "—"}</div>
+                    </div>
+                    <div className="meta-item">
+                      <div className="k">{L("rdap")}</div>
+                      <div className="v">
+                        {result.authority.rdap.status}
+                        {result.authority.rdap.organization
+                          ? ` · ${result.authority.rdap.organization}`
+                          : ""}
+                      </div>
+                    </div>
+                    <div className="meta-item">
+                      <div className="k">{L("lookalike")}</div>
+                      <div className="v">{result.authority.lookalikeOf ?? "—"}</div>
                     </div>
                   </div>
-                  <div className="meta-item">
-                    <div className="k">{L("vt")}</div>
-                    <div className="v">
-                      {result.virusTotal.status} · mal {result.virusTotal.malicious} · sus{" "}
-                      {result.virusTotal.suspicious}
-                      {result.virusTotal.cached ? " · cached" : ""}
-                    </div>
-                  </div>
-                  <div className="meta-item">
-                    <div className="k">Intel</div>
-                    <div className="v">
-                      {result.threatIntel
-                        ? result.threatIntel.status === "listed"
-                          ? `LISTED · ${result.threatIntel.listedBy.join(", ")}`
-                          : result.threatIntel.status
-                        : "—"}
-                    </div>
-                  </div>
-                  <div className="meta-item">
-                    <div className="k">{L("lookalike")}</div>
-                    <div className="v">{result.authority.lookalikeOf ?? "—"}</div>
-                  </div>
-                  <div className="meta-item">
-                    <div className="k">{L("official")}</div>
-                    <div className="v">
-                      {result.authority.official ? "yes" : "no"}
-                      {result.authority.punycode ? " · punycode" : ""}
-                    </div>
-                  </div>
+
+                  <DataSources result={result} />
                 </div>
 
-                <div className="panel-head">
+                <div className="panel-head" style={{ marginTop: 14 }}>
                   <h3>{L("reasons")}</h3>
                 </div>
                 <div className="reasons">

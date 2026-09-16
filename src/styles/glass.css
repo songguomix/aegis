@@ -432,15 +432,6 @@ select.input {
   background: var(--bad-bg);
 }
 
-.score {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--text-2);
-  min-width: 28px;
-  text-align: right;
-}
-
 /* Result */
 .result {
   margin-top: 12px;

@@ -165,9 +165,15 @@ async function urlhausFeed(host: string): Promise<SourceHit> {
     (text) => {
       const set = new Set<string>();
       for (const line of text.split("\n")) {
-        // hostfile: may start with #
-        const cleaned = line.replace(/^#\s*/, "");
-        const h = hostFromLine(cleaned.split(/\s+/)[0] ?? "");
+        let t = line.trim();
+        if (!t || t.startsWith("#")) continue;
+        // Format A: "example.com"
+        // Format B: "127.0.0.1 example.com" / "0.0.0.0 example.com"
+        const parts = t.split(/\s+/);
+        const candidate = parts.length >= 2 && /^\d+\.\d+\.\d+\.\d+$/.test(parts[0])
+          ? parts[1]
+          : parts[0];
+        const h = hostFromLine(candidate.replace(/^#/, ""));
         if (h) set.add(h);
       }
       return set;
@@ -236,28 +242,56 @@ async function threatFoxFeed(host: string): Promise<SourceHit> {
 }
 
 async function openPhishFeed(host: string): Promise<SourceHit> {
-  const state = await loadFeed("openphish", "https://openphish.com/feed.txt", (text) => {
+  // Prefer PhishTank verified JSON (free); fall back to OpenPhish community feed.
+  const state = await loadFeed("phishtank", "https://data.phishtank.com/data/online-valid.json", (text) => {
     const set = new Set<string>();
-    for (const line of text.split("\n")) {
-      const h = hostFromLine(line);
-      if (h) set.add(h);
+    try {
+      const data = JSON.parse(text) as Array<{ url?: string }>;
+      for (const row of data) {
+        const h = hostFromLine(String(row.url ?? ""));
+        if (h) set.add(h);
+      }
+    } catch {
+      for (const line of text.split(/[\s,}"]+/)) {
+        const h = hostFromLine(line);
+        if (h) set.add(h);
+      }
     }
     return set;
   });
-  if (!state.ok && state.error) {
-    return { source: "OpenPhish", listed: false, detail: state.error };
+  if (!state.ok) {
+    const alt = await loadFeed("openphish", "https://openphish.com/feed.txt", (text) => {
+      const set = new Set<string>();
+      for (const line of text.split("\n")) {
+        const h = hostFromLine(line);
+        if (h) set.add(h);
+      }
+      return set;
+    });
+    if (!alt.ok && alt.error) {
+      return { source: "PhishTank/OpenPhish", listed: false, detail: alt.error };
+    }
+    const listed =
+      alt.hosts.has(host) || [...alt.hosts].some((h) => host.endsWith(`.${h}`));
+    return {
+      source: "OpenPhish",
+      listed,
+      detail: listed
+        ? "in community phish feed"
+        : alt.ok
+          ? `not_listed (${alt.hosts.size} hosts)`
+          : "feed_unavailable",
+    };
   }
   const listed =
-    state.hosts.has(host) ||
-    [...state.hosts].some((h) => host.endsWith(`.${h}`));
+    state.hosts.has(host) || [...state.hosts].some((h) => host.endsWith(`.${h}`));
   return {
-    source: "OpenPhish",
+    source: "PhishTank",
     listed,
     detail: listed
-      ? "in community phish feed"
-      : state.ok
-        ? `not_listed (${state.hosts.size} hosts)`
-        : "feed_unavailable",
+      ? "in verified phish feed"
+      : `not_listed (${state.hosts.size} hosts)`,
+    url: listed ? "https://phishtank.org/" : undefined,
   };
 }
 
@@ -282,14 +316,17 @@ export async function lookupThreatIntel(
   ]);
 
   const listedBy = sources.filter((s) => s.listed).map((s) => s.source);
-  const failed = sources.filter(
-    (s) =>
-      !s.listed &&
-      (s.detail === "feed_unavailable" ||
-        String(s.detail).startsWith("http_") ||
-        s.detail === "aborted" ||
-        s.detail === "error"),
-  );
+  const failed = sources.filter((s) => {
+    if (s.listed) return false;
+    const d = String(s.detail ?? "");
+    return (
+      d === "feed_unavailable" ||
+      d.startsWith("http_") ||
+      d.includes("failed") ||
+      d === "error" ||
+      d === "aborted"
+    );
+  });
 
   let status: IntelStatus;
   if (listedBy.length > 0) status = "listed";

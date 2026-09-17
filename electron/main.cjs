@@ -131,7 +131,7 @@ function createFloatingWindow() {
   const { screen } = require("electron");
   const display = screen.getPrimaryDisplay();
   const { workArea } = display;
-  const width = 420;
+  const width = 232;
   const height = 56;
 
   floatingWindow = new BrowserWindow({
@@ -222,6 +222,15 @@ ipcMain.on("aegis:open-main", () => {
     mainWindow.show();
     mainWindow.focus();
   }
+});
+ipcMain.on("aegis:float-size", (_e, compact) => {
+  if (!floatingWindow || floatingWindow.isDestroyed()) return;
+  const width = compact ? 232 : 420;
+  const height = 56;
+  const [x, y] = floatingWindow.getPosition();
+  const [w] = floatingWindow.getSize();
+  const nx = Math.round(x + (w - width) / 2);
+  floatingWindow.setBounds({ x: nx, y, width, height });
 });
 
 app.whenReady().then(async () => {

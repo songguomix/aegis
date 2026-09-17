@@ -1097,6 +1097,20 @@ export default function App() {
                       )}
                     </div>
                     <div className="help">{L("sessionTrustHelp")}</div>
+                    {sessionTrust.length > 0 && (
+                      <div>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={async () => {
+                            await api.clearSessionTrust();
+                            await refresh();
+                            setToast(L("historyCleared"));
+                          }}
+                        >
+                          {L("clearTrust")}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>

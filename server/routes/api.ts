@@ -28,6 +28,7 @@ import {
   listTrust,
   trustDomain,
   untrustDomain,
+  isValidHostname,
 } from "../services/sessionTrust.js";
 import { AGENT_GUARD_POLICY, policyText } from "../services/agentPolicy.js";
 
@@ -256,11 +257,19 @@ export function createApiRouter(): express.Router {
       res.status(400).json({ error: "invalid_request" });
       return;
     }
-    const entry = trustDomain(parsed.data.hostname, {
-      reason: parsed.data.reason,
-      source: parsed.data.source ?? "user",
-    });
-    res.json(entry);
+    if (!isValidHostname(parsed.data.hostname)) {
+      res.status(400).json({ error: "invalid_hostname" });
+      return;
+    }
+    try {
+      const entry = trustDomain(parsed.data.hostname, {
+        reason: parsed.data.reason,
+        source: parsed.data.source ?? "user",
+      });
+      res.json(entry);
+    } catch {
+      res.status(400).json({ error: "invalid_hostname" });
+    }
   });
 
   router.delete("/session-trust/:host", (req, res) => {
@@ -269,7 +278,7 @@ export function createApiRouter(): express.Router {
       res.status(400).json({ error: "invalid_request" });
       return;
     }
-    if (host === "*") {
+    if (host === "*" || host === "%2A") {
       clearTrust();
       res.json({ ok: true, cleared: true });
       return;

@@ -264,4 +264,8 @@ export const api = {
       `/session-trust/${encodeURIComponent(hostname)}`,
       { method: "DELETE" },
     ),
+  clearSessionTrust: () =>
+    request<{ ok: boolean; cleared: boolean }>("/session-trust/%2A", {
+      method: "DELETE",
+    }),
 };

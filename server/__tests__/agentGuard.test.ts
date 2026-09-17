@@ -58,6 +58,35 @@ describe("session trust", () => {
     expect(r.decision).toBe("block");
   });
 
+  it("still blocks VT malicious even if session-trusted", async () => {
+    trustDomain("malware-partner.example", { source: "user" });
+    primeVtCache("malware-partner.example", {
+      status: "malicious",
+      malicious: 15,
+      suspicious: 2,
+      harmless: 0,
+      undetected: 0,
+      reputation: -20,
+      categories: ["malware"],
+      cached: false,
+      permalink: null,
+    });
+    const r = await runGate(
+      "https://malware-partner.example/payload",
+      base,
+      offline,
+    );
+    expect(r.decision).toBe("block");
+  });
+
+  it("rejects invalid hostname for trust", async () => {
+    const { isValidHostname } = await import("../services/sessionTrust.js");
+    expect(isValidHostname("https://evil.com")).toBe(false);
+    expect(isValidHostname("evil.com/path")).toBe(false);
+    expect(isValidHostname("not a host")).toBe(false);
+    expect(isValidHostname("partner.example")).toBe(true);
+  });
+
   it("untrust restores review", async () => {
     trustDomain("x.example");
     untrustDomain("x.example");

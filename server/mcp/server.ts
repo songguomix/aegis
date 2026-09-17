@@ -17,6 +17,7 @@ import {
   listTrust,
   trustDomain,
   untrustDomain,
+  isValidHostname,
 } from "../services/sessionTrust.js";
 import { AGENT_GUARD_POLICY, policyText } from "../services/agentPolicy.js";
 
@@ -136,6 +137,21 @@ export function createMcpServer(): McpServer {
       },
     },
     async ({ hostname, reason }) => {
+      if (!isValidHostname(hostname)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: "invalid_hostname",
+                hostname,
+                hint: "Use a bare hostname like partner.example — no scheme or path.",
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
       const entry = trustDomain(hostname, { reason, source: "agent" });
       return { content: [{ type: "text", text: JSON.stringify(entry, null, 2) }] };
     },
@@ -318,7 +334,7 @@ export function createMcpServer(): McpServer {
     {
       title: "Resolve a pending review",
       description:
-        "After asking the human (or yourself), set a pending review to allow or block. alwaysAllow=true also adds the host to the permanent allow/deny list.",
+        "After explicit human confirmation, set a pending review to allow or block. Do not call this autonomously. alwaysAllow=true also writes the host to permanent allow/deny list.",
       inputSchema: {
         id: z.string().describe("Review id from check_url / get_pending_reviews"),
         decision: z.enum(["allow", "block"]),

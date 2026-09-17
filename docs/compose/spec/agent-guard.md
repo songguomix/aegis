@@ -1,14 +1,25 @@
 ---
 feature: agent-guard
-status: in-progress
+status: delivered
 updated: 2026-09-17
 branch: feat/agent-guard
-commits: 8a37f73..1696efe
+commits: 8a37f73..c011696
 ---
 
 # Agent Guard — 接入协议 + 会话信任
 
 ## Report
+
+**What was built** — Aegis Agent Guard v1.0 定义 Harness 出网前的强制协议（preflight / allow / block / review / search / files），并通过 MCP 与 HTTP 提供 `agent_guard_policy`、`scan_search_results`、`trust_domain`、`session_trust` 等工具。待审通过后可写入**会话信任**（非永久白名单），门禁在 denylist / VT malicious / 威胁情报 LISTED 等硬危险信号之后，才对 session-trusted 主机放行。操作者可在 Settings 配置 **customBrands**（私有官方域名主体），并维护会话信任列表；接入页展示协议步骤，`examples/agent-guard` 提供 MCP 配置与 SKILL 片段。
+
+**Verification** — `npm run typecheck` PASS；`npm test` **32/32** PASS（含 session trust allow、denylist/malicious 仍 block、非法 hostname、custom brand）；`npm run build` PASS；`GET /api/v1/agent-policy` 返回 Aegis Agent Guard 1.0；POST 非法 hostname → 400；无 Origin 的 session-trust POST 无 token → 401；`DELETE /session-trust/%2A` 可清空；MCP tools/list 含 `scan_search_results` / `trust_domain` / `agent_guard_policy`。首轮评审 REQUEST_CHANGES，修复后复审 **APPROVE**。
+
+**Journey log** —
+1. 会话信任 ≠ 永久 allowlist；硬危险（denylist / VT malicious / intel listed）优先于信任。
+2. 本地安全 POST（session-trust、reviews resolve）在无浏览器 Origin 时需 `X-Aegis-Token`，控制台同源不受影响。
+3. 服务数据目录统一：`AEGIS_DATA_DIR` 或模块相对 `ROOT/.aegis`（store / trust / reviews / VT / intel）。
+4. 自定义品牌合并进权威库，并参与仿冒检测基线；同主机 custom 覆盖 builtin。
+5. 审计工具不可完全依赖 MCP 描述做权限；`resolve_review` 文案要求「显式人类确认」。
 
 ## [S1] Problem
 
@@ -27,57 +38,54 @@ Aegis 已能对 URL 做三态门禁，但 **Agent Harness 缺少强制接入约�
 
 ### 会话信任（Session Trust）
 
-- 内存 + 本地持久化：`hostname` → { addedAt, reason, source }
-- 来源：`user`（控制台）、`agent`（MCP）、`resolve`
-- 默认 TTL：会话有效（应用重启保留，可手动清除）；不等于永久 allowlist
-- 门禁顺序：denylist → allowlist(永久) → **session trust** → 永久 policy  
-  - session trust + VT/intel 无高危 → `allow`（不 enqueue review）
-  - session trust + VT malicious / intel listed / denylist → 仍 `block`
+- 本地持久化：`hostname` → { addedAt, reason, source }
+- 来源：`user` / `agent` / `resolve`
+- 应用重启保留；不等于永久 allowlist；可一键清空
+- 门禁顺序：denylist → allowlist(永久) → **session trust**（仅当无硬危险）  
+  - session trust + VT/intel 无高危 → `allow`
+  - denylist / VT malicious / intel listed → 仍 `block`
+- hostname 校验：非法（含 scheme/路径/空格）→ HTTP 400 / MCP error
 
 ### 自定义权威域名
 
 - `EngineConfig.customBrands`: `[{ host, brand, subject }]`
-- 注册表查找顺序：内置 official-domains.json → customBrands
-- Settings 可编辑；`GET/PUT /api/v1/config`
+- 查找顺序：内置 official-domains.json → customBrands（同 host 可覆盖）
+- Settings 可编辑；`PUT /api/v1/config`
 
 ### MCP / HTTP 契约
 
 | 工具 / 接口 | 作用 |
 |-------------|------|
-| `check_url` | 门禁；review 时带 `reviewId` + 协议提示 |
-| `scan_search_results({ urls })` | 批量核查（alias of check_urls_batch） |
-| `check_urls_batch` | 原批量工具保留 |
-| `trust_domain({ hostname, reason? })` | 会话信任 |
-| `session_trust()` | 列出会话信任 |
-| `untrust_domain({ hostname })` | 移除 |
-| `agent_guard_policy()` | 返回协议文本与当前策略摘要 |
-| `GET /session-trust` / `POST /session-trust` / `DELETE /session-trust/:host` | HTTP 同源能力 |
-| `GET /agent-policy` | 协议 JSON |
+| `agent_guard_policy` / `GET /agent-policy` | 协议文本与规则 |
+| `check_url` | 门禁；review 时带 reviewId + 协议提示 |
+| `scan_search_results` / `check_urls_batch` | 批量核查 + worst-case |
+| `check_file_hash` | 下载文件哈希 |
+| `trust_domain` / `POST /session-trust` | 会话信任（校验 hostname） |
+| `session_trust` / `GET /session-trust` | 列表 |
+| `untrust_domain` / `DELETE /session-trust/:host` | 移除 |
+| `DELETE /session-trust/%2A` | 清空 |
+| `get_pending_reviews` / `resolve_review` | 待审（resolve 需人类确认文案） |
+| `verify_domain` / `get_gate_status` | 原有能力 |
+
+安全：无浏览器 `Origin` 时，`POST /session-trust`、`POST /reviews/*`、`DELETE/PATCH` 等变更接口要求 `X-Aegis-Token`（`.aegis/token`）。
 
 ### 控制台
 
-- **设置**：自定义权威域名 textarea（`host | brand | subject` 每行）
-- **设置/总览**：会话信任列表 + 清除
-- **接入**：Agent Guard 协议步骤 + MCP 工具列表更新
-
-### 错误行为
-
-- trust 非法 hostname → 400
-- trust 的 host 在 denylist → 仍 block
-- scan 结果 `decision` 取 worst-case（同 batch）
+- **设置**：customBrands 文本行、会话信任列表与清空、提示音、策略等
+- **接入**：Agent Guard 协议步骤 + MCP/HTTP 说明
 
 ## [S3] Out of Scope
 
 - 系统级进程网络钩子 / MITM
 - 云端多租户策略同步
-- 永久自动学习误报改阈值（可后续迭代）
+- 服务端强制 MCP resolve 前的二次人类确认（协议约定 + UI/悬浮窗承担）
 
 ## Tasks
 
-- [x] T1: Spec `docs/compose/spec/agent-guard.md` — acceptance: 本文件含协议与契约 (covers: S2)
-- [x] T2: Session trust store + gate 接入 — acceptance: 单测：trust 后未知域名 allow；malicious 仍 block (covers: S2)
-- [x] T3: customBrands 注册表 + config API — acceptance: PUT config 后 lookup 命中自定义品牌 (covers: S2)
-- [x] T4: MCP tools + HTTP session-trust/agent-policy — acceptance: tools/list 含 scan_search_results / trust_domain / agent_guard_policy；curl /agent-policy 返回协议 (covers: S2)
-- [x] T5: Settings / 接入页 UI — acceptance: 可编辑 customBrands 与查看/清除 session trust (covers: S2)
-- [x] T6: examples/agent-guard — acceptance: MCP 配置 + 协议 README + curl 示例可复制 (covers: S2)
-- [ ] T7: Verify + review + finalize — acceptance: typecheck/test/build PASS；独立评审通过；Report 填写 (covers: S2)
+- [x] T1: Spec `docs/compose/spec/agent-guard.md` — acceptance: 协议与契约齐备 (covers: S2)
+- [x] T2: Session trust store + gate 接入 — acceptance: trust 后未知域名 allow；denylist/VT malicious 仍 block (covers: S2)
+- [x] T3: customBrands 注册表 + config API — acceptance: PUT 后 lookup 命中自定义品牌 (covers: S2)
+- [x] T4: MCP tools + HTTP session-trust/agent-policy — acceptance: tools 与 /agent-policy 可用 (covers: S2)
+- [x] T5: Settings / 接入页 UI — acceptance: customBrands 与 session trust 可管理 (covers: S2)
+- [x] T6: examples/agent-guard — acceptance: MCP + 协议 README + SKILL (covers: S2)
+- [x] T7: Verify + review + finalize — acceptance: typecheck/test/build PASS；评审 APPROVE；Report 完成 (covers: S2)

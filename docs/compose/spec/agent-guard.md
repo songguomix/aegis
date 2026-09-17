@@ -1,9 +1,9 @@
 ---
 feature: agent-guard
-status: designed
+status: in-progress
 updated: 2026-09-17
 branch: feat/agent-guard
-commits: 8a37f73..pending
+commits: 8a37f73..1696efe
 ---
 
 # Agent Guard — 接入协议 + 会话信任
@@ -74,10 +74,10 @@ Aegis 已能对 URL 做三态门禁，但 **Agent Harness 缺少强制接入约�
 
 ## Tasks
 
-- [ ] T1: Spec `docs/compose/spec/agent-guard.md` — acceptance: 本文件含协议与契约 (covers: S2)
-- [ ] T2: Session trust store + gate 接入 — acceptance: 单测：trust 后未知域名 allow；malicious 仍 block (covers: S2)
-- [ ] T3: customBrands 注册表 + config API — acceptance: PUT config 后 lookup 命中自定义品牌 (covers: S2)
-- [ ] T4: MCP tools + HTTP session-trust/agent-policy — acceptance: tools/list 含 scan_search_results / trust_domain / agent_guard_policy；curl /agent-policy 返回协议 (covers: S2)
-- [ ] T5: Settings / 接入页 UI — acceptance: 可编辑 customBrands 与查看/清除 session trust (covers: S2)
-- [ ] T6: examples/agent-guard — acceptance: MCP 配置 + 协议 README + curl 示例可复制 (covers: S2)
+- [x] T1: Spec `docs/compose/spec/agent-guard.md` — acceptance: 本文件含协议与契约 (covers: S2)
+- [x] T2: Session trust store + gate 接入 — acceptance: 单测：trust 后未知域名 allow；malicious 仍 block (covers: S2)
+- [x] T3: customBrands 注册表 + config API — acceptance: PUT config 后 lookup 命中自定义品牌 (covers: S2)
+- [x] T4: MCP tools + HTTP session-trust/agent-policy — acceptance: tools/list 含 scan_search_results / trust_domain / agent_guard_policy；curl /agent-policy 返回协议 (covers: S2)
+- [x] T5: Settings / 接入页 UI — acceptance: 可编辑 customBrands 与查看/清除 session trust (covers: S2)
+- [x] T6: examples/agent-guard — acceptance: MCP 配置 + 协议 README + curl 示例可复制 (covers: S2)
 - [ ] T7: Verify + review + finalize — acceptance: typecheck/test/build PASS；独立评审通过；Report 填写 (covers: S2)

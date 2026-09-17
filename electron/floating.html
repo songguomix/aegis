@@ -15,8 +15,11 @@
         --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
           "PingFang SC", sans-serif;
       }
-      * { box-sizing: border-box; }
-      html, body {
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
         margin: 0;
         min-height: 100%;
         font-family: var(--font);
@@ -42,10 +45,9 @@
         width: 100%;
         height: 100%;
         min-height: 52px;
-        display: grid;
-        grid-template-columns: 12px auto minmax(0, 1fr) 28px;
+        display: flex;
         align-items: center;
-        gap: 8px 10px;
+        gap: 8px;
         padding: 8px 8px 8px 12px;
         border-radius: 18px;
         background: rgba(255, 255, 255, 0.78);
@@ -55,6 +57,7 @@
           0 10px 32px rgba(15, 23, 42, 0.14);
         backdrop-filter: blur(28px) saturate(170%);
         -webkit-backdrop-filter: blur(28px) saturate(170%);
+        transition: padding 0.3s ease;
       }
 
       body.preview .bar {
@@ -66,12 +69,16 @@
       }
 
       .light {
+        flex-shrink: 0;
         width: 11px;
         height: 11px;
         border-radius: 50%;
         background: #a3a3a3;
         box-shadow: 0 0 0 3px rgba(163, 163, 163, 0.16);
-        transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        transition:
+          background 0.2s ease,
+          box-shadow 0.2s ease,
+          transform 0.2s ease;
       }
       .light.allow {
         background: var(--ok);
@@ -85,32 +92,42 @@
         background: var(--bad);
         box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.18);
       }
-      .light.pulse { animation: pulse 0.55s ease; }
+      .light.pulse {
+        animation: pulse 0.55s ease;
+      }
       @keyframes pulse {
-        0% { transform: scale(0.85); }
-        55% { transform: scale(1.22); }
-        100% { transform: scale(1); }
+        0% {
+          transform: scale(0.85);
+        }
+        55% {
+          transform: scale(1.22);
+        }
+        100% {
+          transform: scale(1);
+        }
       }
 
       .counts {
         -webkit-app-region: no-drag;
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         gap: 2px;
         padding: 3px;
         border-radius: 12px;
         background: rgba(17, 24, 39, 0.04);
-        flex-shrink: 0;
+        cursor: pointer;
       }
       .count {
         min-width: 40px;
         padding: 3px 7px;
         border-radius: 9px;
         text-align: center;
-        cursor: pointer;
         transition: background 0.15s ease;
       }
-      .count:hover { background: rgba(255, 255, 255, 0.85); }
+      .count:hover {
+        background: rgba(255, 255, 255, 0.85);
+      }
       .count .n {
         display: block;
         font-size: 13.5px;
@@ -129,47 +146,53 @@
         line-height: 1;
         margin-top: 1px;
       }
-      .count.allow .n { color: var(--ok); }
-      .count.review .n { color: var(--warn); }
-      .count.block .n { color: var(--bad); }
+      .count.allow .n {
+        color: var(--ok);
+      }
+      .count.review .n {
+        color: var(--warn);
+      }
+      .count.block .n {
+        color: var(--bad);
+      }
 
-      /* Right: full-width domain ticker — always filled */
-      .ticker {
+      /*
+        Domain strip: NOT a permanent right column.
+        flex:0 → no empty space when idle.
+        When .has-domain → flex:1 and fills ALL remaining width.
+      */
+      .domain {
         -webkit-app-region: no-drag;
+        flex: 0 0 0%;
         min-width: 0;
-        height: 100%;
-        position: relative;
+        max-width: 0;
+        opacity: 0;
         overflow: hidden;
         border-radius: 12px;
-        background: rgba(17, 24, 39, 0.035);
-        cursor: pointer;
-      }
-
-      .ticker-item {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
+        background: rgba(17, 24, 39, 0.045);
+        height: 36px;
+        display: flex;
         align-items: center;
         gap: 8px;
-        padding: 0 12px;
-        opacity: 0;
-        transform: translateX(28px);
+        padding: 0;
+        cursor: pointer;
         transition:
-          opacity 0.32s ease,
-          transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
-        pointer-events: none;
+          flex 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          max-width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          opacity 0.28s ease,
+          padding 0.28s ease,
+          transform 0.28s ease;
+        transform: translateX(12px);
       }
-      .ticker-item.in {
+      .bar.has-domain .domain {
+        flex: 1 1 auto;
+        max-width: none;
         opacity: 1;
+        padding: 0 12px;
         transform: translateX(0);
       }
-      .ticker-item.out {
-        opacity: 0;
-        transform: translateX(-22px);
-      }
 
-      .tag {
+      .domain .tag {
         flex-shrink: 0;
         font-size: 10px;
         font-weight: 700;
@@ -191,9 +214,14 @@
         color: var(--bad);
         background: rgba(190, 18, 60, 0.12);
       }
+      .tag.ok {
+        color: var(--muted);
+        background: rgba(17, 24, 39, 0.06);
+      }
 
-      .host {
+      .domain .host {
         min-width: 0;
+        flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -201,10 +229,12 @@
         font-size: 12.5px;
         font-weight: 600;
         color: var(--text);
+        text-align: left;
       }
 
       .open {
         -webkit-app-region: no-drag;
+        flex-shrink: 0;
         appearance: none;
         border: 1px solid rgba(17, 24, 39, 0.08);
         width: 28px;
@@ -215,29 +245,63 @@
         cursor: pointer;
         display: grid;
         place-items: center;
-        transition: background 0.15s ease, transform 0.15s ease;
+        transition:
+          background 0.15s ease,
+          transform 0.15s ease;
         padding: 0;
       }
       .open:hover {
         background: #fff;
         transform: translateY(-1px);
       }
-      .open svg { display: block; }
+      .open svg {
+        display: block;
+      }
 
-      .bar.flash-allow { animation: flashOk 0.45s ease; }
-      .bar.flash-review { animation: flashWarn 0.45s ease; }
-      .bar.flash-block { animation: flashBad 0.45s ease; }
+      .bar.flash-allow {
+        animation: flashOk 0.45s ease;
+      }
+      .bar.flash-review {
+        animation: flashWarn 0.45s ease;
+      }
+      .bar.flash-block {
+        animation: flashBad 0.45s ease;
+      }
       @keyframes flashOk {
-        0% { box-shadow: inset 0 0 0 2px rgba(5, 150, 105, 0.45), 0 10px 32px rgba(15, 23, 42, 0.14); }
-        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        0% {
+          box-shadow:
+            inset 0 0 0 2px rgba(5, 150, 105, 0.45),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        100% {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
       }
       @keyframes flashWarn {
-        0% { box-shadow: inset 0 0 0 2px rgba(217, 119, 6, 0.45), 0 10px 32px rgba(15, 23, 42, 0.14); }
-        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        0% {
+          box-shadow:
+            inset 0 0 0 2px rgba(217, 119, 6, 0.45),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        100% {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
       }
       @keyframes flashBad {
-        0% { box-shadow: inset 0 0 0 2px rgba(190, 18, 60, 0.45), 0 10px 32px rgba(15, 23, 42, 0.14); }
-        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        0% {
+          box-shadow:
+            inset 0 0 0 2px rgba(190, 18, 60, 0.45),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        100% {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
       }
     </style>
   </head>
@@ -258,10 +322,19 @@
           <span class="l">NO</span>
         </div>
       </div>
-      <div class="ticker" id="ticker" title="Open Aegis"></div>
+      <div class="domain" id="domain" title="Open Aegis">
+        <span class="tag" id="tag"></span>
+        <span class="host" id="host"></span>
+      </div>
       <button class="open" id="btn-open" title="Open Aegis" aria-label="Open">
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M4 10L10 4M10 4H5.5M10 4V8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path
+            d="M4 10L10 4M10 4H5.5M10 4V8.5"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
       </button>
     </div>
@@ -271,21 +344,21 @@
         document.body.classList.add("preview");
       }
       (function () {
-        const HOLD_MS = 3200;
-        const CYCLE_MS = 2200;
+        const LIVE_MS = 5000;
         const params = new URLSearchParams(location.search);
         const port = params.get("port") || "7832";
         const base = `http://127.0.0.1:${port}/api/v1`;
 
         const bar = document.getElementById("bar");
         const light = document.getElementById("light");
-        const ticker = document.getElementById("ticker");
+        const tag = document.getElementById("tag");
+        const host = document.getElementById("host");
+        const domainEl = document.getElementById("domain");
 
-        let queue = []; // {decision, host}
-        let current = null;
-        let currentEl = null;
         let lastId = null;
-        let seenIds = new Set();
+        let hideTimer = null;
+        let queue = [];
+        let live = false;
 
         function setLight(decision) {
           light.className = "light " + (decision || "");
@@ -294,69 +367,53 @@
         }
 
         function flash(decision) {
+          const cls = "flash-" + decision;
           bar.classList.remove("flash-allow", "flash-review", "flash-block");
           void bar.offsetWidth;
-          bar.classList.add("flash-" + decision);
-          setTimeout(() => {
-            bar.classList.remove("flash-allow", "flash-review", "flash-block");
-          }, 480);
+          bar.classList.add(cls);
+          setTimeout(() => bar.classList.remove(cls), 480);
         }
 
-        function createItem(decision, host) {
-          const el = document.createElement("div");
-          el.className = "ticker-item";
-          el.innerHTML =
-            '<span class="tag ' +
-            decision +
-            '"></span><span class="host"></span>';
-          el.querySelector(".tag").textContent = decision;
-          el.querySelector(".host").textContent = host;
-          return el;
-        }
-
-        function showNext() {
-          if (!queue.length) {
-            // keep cycling the last domain instead of leaving empty space
-            if (current) {
-              queue.push(current);
-            } else {
-              queue.push({ decision: "ok", host: "Aegis · waiting" });
-            }
-          }
-          const next = queue.shift();
-          const el = createItem(next.decision, next.host);
-          ticker.appendChild(el);
-          const prevEl = currentEl;
-          requestAnimationFrame(() => {
-            el.classList.add("in");
-            if (prevEl) {
-              prevEl.classList.add("out");
-              setTimeout(() => prevEl.remove(), 400);
-            }
-          });
-          currentEl = el;
-          current = next;
-          if (next.decision !== "ok") setLight(next.decision);
-        }
-
-        function enqueue(decision, host) {
-          const item = { decision, host };
-          // newest first for immediacy; avoid dupes
-          queue = queue.filter((q) => q.host !== host);
-          queue.unshift(item);
-          if (queue.length > 8) queue = queue.slice(0, 8);
+        /** Expand domain to fill ALL remaining bar width. */
+        function showDomain(decision, hostname) {
+          live = true;
+          setLight(decision);
+          tag.className = "tag " + decision;
+          tag.textContent = decision;
+          host.textContent = hostname || "";
+          // force reflow then expand — no reserved empty right side
+          bar.classList.remove("has-domain");
+          void domainEl.offsetWidth;
+          bar.classList.add("has-domain");
           flash(decision);
-          // interrupt empty wait: if ticker is placeholder, show now
-          if (!current || current.host === "Aegis · waiting") {
-            // force cycle soon
+          clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => {
+            live = false;
+            bar.classList.remove("has-domain");
+            const next = queue.shift();
+            if (next) {
+              setTimeout(() => showDomain(next.decision, next.hostname), 220);
+            }
+          }, LIVE_MS);
+        }
+
+        function pushDomain(decision, hostname) {
+          if (live) {
+            queue = queue.filter((q) => q.hostname !== hostname);
+            queue.unshift({ decision, hostname });
+            if (queue.length > 4) queue.length = 4;
+            // update light immediately, domain replaces when current ends
+            setLight(decision);
+            return;
           }
+          showDomain(decision, hostname);
         }
 
         async function refresh() {
           try {
             const [healthRes, histRes] = await Promise.all([
               fetch(base + "/health"),
-              fetch(base + "/history?limit=12"),
+              fetch(base + "/history?limit=5"),
             ]);
             const health = await healthRes.json();
             const hist = await histRes.json();
@@ -371,31 +428,19 @@
             );
 
             const items = hist?.items ?? [];
-            for (const item of items) {
-              if (!item || seenIds.has(item.id)) continue;
-              seenIds.add(item.id);
-              if (!lastId) {
-                // first load: fill ticker with recent hosts (oldest → newest for cycle)
-                for (const h of [...items].reverse()) {
-                  if (h?.hostname) {
-                    queue.push({ decision: h.decision, host: h.hostname });
-                    seenIds.add(h.id);
-                  }
-                }
-                if (queue.length) {
-                  lastId = items[0].id;
-                  setLight(items[0].decision);
-                }
-                break;
+            const newest = items[0];
+            if (newest && newest.id !== lastId) {
+              if (lastId === null) {
+                // boot: light only — do NOT leave an empty domain slot
+                lastId = newest.id;
+                setLight(newest.decision);
+              } else {
+                lastId = newest.id;
+                pushDomain(newest.decision, newest.hostname || newest.url);
               }
-              enqueue(item.decision, item.hostname || item.url);
-              lastId = item.id;
-            }
-            if (!seenIds.size && items[0]) {
-              lastId = items[0].id;
             }
           } catch {
-            /* keep last ticker content */
+            /* ignore */
           }
         }
 
@@ -406,25 +451,24 @@
         }
         document.getElementById("btn-open").onclick = openMain;
         document.getElementById("counts").onclick = openMain;
-        ticker.onclick = openMain;
+        domainEl.onclick = openMain;
 
-        // Always slide domains — never leave the right side blank
-        showNext();
-        setInterval(showNext, CYCLE_MS);
         refresh();
         setInterval(refresh, 2000);
 
         if (new URLSearchParams(location.search).get("demo") === "1") {
+          const demo = [
+            ["allow", "github.com"],
+            ["review", "unknown-partner.example"],
+            ["block", "guthub.com"],
+            ["allow", "raw.githubusercontent.com"],
+          ];
+          let i = 0;
           setInterval(() => {
-            const demo = [
-              ["allow", "github.com"],
-              ["allow", "pypi.org"],
-              ["review", "new-site.example"],
-              ["block", "guthub.com"],
-            ];
-            const d = demo[Math.floor(Math.random() * demo.length)];
-            enqueue(d[0], d[1]);
-          }, 4000);
+            const d = demo[i % demo.length];
+            i++;
+            pushDomain(d[0], d[1]);
+          }, 3500);
         }
       })();
     </script>

@@ -170,6 +170,14 @@ function createFloatingWindow() {
     floatingWindow.showInactive();
   });
 
+  // Reset anchor when user moves the float — future resizes keep that spot
+  floatingWindow.on("moved", () => {
+    if (!floatingWindow || floatingWindow.isDestroyed()) return;
+    const [x, y] = floatingWindow.getPosition();
+    const [w] = floatingWindow.getSize();
+    floatAnchor = { x, y, width: w };
+  });
+
   floatingWindow.on("closed", () => {
     floatingWindow = null;
   });
@@ -216,6 +224,9 @@ function createWindow() {
 }
 
 ipcMain.handle("aegis:get-api-base", () => `http://127.0.0.1:${apiPort}/api/v1`);
+let floatAnchor = null; // {x, y, width} — center-stable resize base
+let floatCompact = true;
+
 ipcMain.on("aegis:open-main", () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -223,36 +234,57 @@ ipcMain.on("aegis:open-main", () => {
     mainWindow.focus();
   }
 });
-ipcMain.on("aegis:float-size", (_e, compact) => {
+
+ipcMain.on("aegis:float-anchor-lock", () => {
   if (!floatingWindow || floatingWindow.isDestroyed()) return;
-  const targetWidth = compact ? 232 : 420;
-  const height = 56;
   const [x, y] = floatingWindow.getPosition();
   const [w] = floatingWindow.getSize();
-  const from = w;
+  floatAnchor = { x, y, width: w };
+});
+
+ipcMain.on("aegis:float-size", (_e, compact) => {
+  if (!floatingWindow || floatingWindow.isDestroyed()) return;
+  floatCompact = Boolean(compact);
+  const targetWidth = floatCompact ? 232 : 420;
+  const height = 56;
+
+  // Stable visual center: use current center at animation start; never re-jump after.
+  if (!floatAnchor) {
+    const [x, y] = floatingWindow.getPosition();
+    const [w] = floatingWindow.getSize();
+    floatAnchor = { x, y, width: w };
+  }
+  const centerX = floatAnchor.x + floatAnchor.width / 2;
+  const y = floatAnchor.y;
+
+  const [cx] = floatingWindow.getPosition();
+  const [cw] = floatingWindow.getSize();
+  const from = cw;
   const to = targetWidth;
+  const finishX = Math.round(centerX - to / 2);
+
   if (Math.abs(to - from) < 2) {
-    floatingWindow.setBounds({
-      x: Math.round(x + (w - to) / 2),
-      y,
-      width: to,
-      height,
-    });
+    floatingWindow.setBounds({ x: finishX, y, width: to, height });
+    floatAnchor = { x: finishX, y, width: to };
     return;
   }
+
   const start = Date.now();
-  const duration = 380;
+  const duration = 400;
+  const fromX = cx;
   const tick = () => {
     if (!floatingWindow || floatingWindow.isDestroyed()) return;
     const t = Math.min(1, (Date.now() - start) / duration);
-    // ease-out cubic
     const e = 1 - Math.pow(1 - t, 3);
     const width = Math.round(from + (to - from) * e);
-    const [cx] = floatingWindow.getPosition();
-    const [cw] = floatingWindow.getSize();
-    const nx = Math.round(cx + (cw - width) / 2);
-    floatingWindow.setBounds({ x: nx, y, width, height });
-    if (t < 1) setImmediate(tick);
+    // interpolate toward the same center — ends exactly at finishX, no post-jump
+    const x = Math.round(fromX + (finishX - fromX) * e);
+    floatingWindow.setBounds({ x, y, width, height });
+    if (t < 1) {
+      setImmediate(tick);
+    } else {
+      floatAnchor = { x: finishX, y, width: to };
+    }
   };
   tick();
 });

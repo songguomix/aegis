@@ -60,27 +60,24 @@
           0 10px 32px rgba(15, 23, 42, 0.14);
         backdrop-filter: blur(28px) saturate(170%);
         -webkit-backdrop-filter: blur(28px) saturate(170%);
-        transition:
-          box-shadow 0.45s var(--soft),
-          transform 0.45s var(--spring);
-        will-change: box-shadow;
+        transition: box-shadow 0.4s var(--soft);
       }
-      .bar.has-domain {
+      .bar.has-domain,
+      .bar.has-review {
         justify-content: flex-start;
       }
       .bar.lift {
-        transform: scale(1.015);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.98),
           0 14px 40px rgba(15, 23, 42, 0.18);
       }
 
       body.preview .bar {
-        width: min(460px, 94vw);
+        width: min(480px, 94vw);
         height: 56px;
-        transition: width 0.45s var(--spring), box-shadow 0.45s var(--soft);
+        transition: width 0.4s var(--spring), box-shadow 0.4s var(--soft);
       }
-      body.preview .bar:not(.has-domain) {
+      body.preview .bar:not(.has-domain):not(.has-review) {
         width: min(240px, 88vw);
         margin: 0 auto;
       }
@@ -94,17 +91,9 @@
         background: #a3a3a3;
         box-shadow: 0 0 0 3px rgba(163, 163, 163, 0.16);
         transition:
-          background 0.35s var(--soft),
-          box-shadow 0.45s var(--soft),
-          transform 0.4s var(--spring);
-      }
-      .light::after {
-        content: "";
-        position: absolute;
-        inset: -3px;
-        border-radius: 50%;
-        border: 1.5px solid transparent;
-        opacity: 0;
+          background 0.3s var(--soft),
+          box-shadow 0.35s var(--soft),
+          transform 0.35s var(--spring);
       }
       .light.allow {
         background: var(--ok);
@@ -118,6 +107,14 @@
         background: var(--bad);
         box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.18);
       }
+      .light::after {
+        content: "";
+        position: absolute;
+        inset: -3px;
+        border-radius: 50%;
+        border: 1.5px solid transparent;
+        opacity: 0;
+      }
       .light.allow::after {
         border-color: rgba(5, 150, 105, 0.45);
       }
@@ -128,20 +125,17 @@
         border-color: rgba(190, 18, 60, 0.45);
       }
       .light.pulse {
-        animation: lightPulse 0.75s var(--spring);
+        animation: lightPulse 0.7s var(--spring);
       }
       .light.pulse::after {
-        animation: ringOut 0.75s var(--soft);
+        animation: ringOut 0.7s var(--soft);
       }
       @keyframes lightPulse {
         0% {
           transform: scale(0.75);
         }
         40% {
-          transform: scale(1.28);
-        }
-        70% {
-          transform: scale(0.94);
+          transform: scale(1.25);
         }
         100% {
           transform: scale(1);
@@ -154,7 +148,7 @@
         }
         100% {
           opacity: 0;
-          transform: scale(2.1);
+          transform: scale(2);
         }
       }
 
@@ -168,42 +162,20 @@
         border-radius: 12px;
         background: rgba(17, 24, 39, 0.04);
         cursor: pointer;
-        transition: background 0.25s var(--soft);
-      }
-      .counts:hover {
-        background: rgba(17, 24, 39, 0.06);
       }
       .count {
-        min-width: 40px;
-        padding: 3px 7px;
+        min-width: 38px;
+        padding: 3px 6px;
         border-radius: 9px;
         text-align: center;
-        transition:
-          background 0.2s var(--soft),
-          transform 0.35s var(--spring);
+        transition: background 0.2s var(--soft);
       }
       .count:hover {
         background: rgba(255, 255, 255, 0.9);
       }
-      .count.bump .n {
-        animation: numBump 0.45s var(--spring);
-      }
-      @keyframes numBump {
-        0% {
-          transform: translateY(2px) scale(0.92);
-          opacity: 0.7;
-        }
-        55% {
-          transform: translateY(-1px) scale(1.06);
-        }
-        100% {
-          transform: translateY(0) scale(1);
-          opacity: 1;
-        }
-      }
       .count .n {
         display: block;
-        font-size: 13.5px;
+        font-size: 13px;
         font-weight: 700;
         letter-spacing: -0.02em;
         line-height: 1.1;
@@ -213,11 +185,10 @@
         display: block;
         font-size: 9px;
         font-weight: 650;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
         color: var(--muted);
         line-height: 1;
         margin-top: 1px;
+        text-transform: uppercase;
       }
       .count.allow .n {
         color: var(--ok);
@@ -228,8 +199,25 @@
       .count.block .n {
         color: var(--bad);
       }
+      .count.bump .n {
+        animation: numBump 0.4s var(--spring);
+      }
+      @keyframes numBump {
+        0% {
+          transform: scale(0.9);
+          opacity: 0.7;
+        }
+        60% {
+          transform: scale(1.08);
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
 
-      .domain {
+      /* expandable middle */
+      .slot {
         -webkit-app-region: no-drag;
         flex: 0 0 0%;
         min-width: 0;
@@ -237,37 +225,31 @@
         opacity: 0;
         overflow: hidden;
         border-radius: 12px;
-        background: linear-gradient(
-          90deg,
-          rgba(17, 24, 39, 0.05),
-          rgba(17, 24, 39, 0.03)
-        );
+        background: rgba(17, 24, 39, 0.04);
         height: 36px;
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 0;
-        cursor: pointer;
-        transform: translateX(16px) scaleX(0.92);
+        transform: translateX(12px) scaleX(0.94);
         transform-origin: left center;
         transition:
-          flex 0.42s var(--spring),
-          max-width 0.42s var(--spring),
-          opacity 0.28s var(--soft) 0.05s,
-          padding 0.32s var(--soft),
-          transform 0.42s var(--spring),
-          background 0.35s var(--soft);
-        will-change: flex, max-width, opacity, transform;
+          flex 0.4s var(--spring),
+          max-width 0.4s var(--spring),
+          opacity 0.25s var(--soft),
+          padding 0.3s var(--soft),
+          transform 0.4s var(--spring);
       }
-      .bar.has-domain .domain {
+      .bar.has-domain .slot,
+      .bar.has-review .slot {
         flex: 1 1 auto;
         max-width: none;
         opacity: 1;
-        padding: 0 12px;
+        padding: 0 8px 0 12px;
         transform: translateX(0) scaleX(1);
       }
 
-      .domain .tag {
+      .tag {
         flex-shrink: 0;
         font-size: 10px;
         font-weight: 700;
@@ -275,16 +257,6 @@
         text-transform: uppercase;
         padding: 2px 6px;
         border-radius: 5px;
-        line-height: 1.2;
-        opacity: 0;
-        transform: translateY(4px);
-        transition:
-          opacity 0.3s var(--soft) 0.12s,
-          transform 0.35s var(--spring) 0.1s;
-      }
-      .bar.has-domain .domain .tag {
-        opacity: 1;
-        transform: translateY(0);
       }
       .tag.allow {
         color: var(--ok);
@@ -299,7 +271,7 @@
         background: rgba(190, 18, 60, 0.12);
       }
 
-      .domain .host {
+      .host {
         min-width: 0;
         flex: 1;
         overflow: hidden;
@@ -309,16 +281,69 @@
         font-size: 12.5px;
         font-weight: 600;
         color: var(--text);
-        text-align: left;
-        opacity: 0;
-        transform: translateY(5px);
-        transition:
-          opacity 0.32s var(--soft) 0.16s,
-          transform 0.38s var(--spring) 0.14s;
+        cursor: pointer;
       }
-      .bar.has-domain .domain .host {
-        opacity: 1;
-        transform: translateY(0);
+
+      .acts {
+        display: none;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .bar.has-review .acts {
+        display: flex;
+      }
+      .bar.has-review .host {
+        cursor: default;
+      }
+
+      .act {
+        -webkit-app-region: no-drag;
+        appearance: none;
+        border: 1px solid transparent;
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 650;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background 0.2s var(--soft),
+          transform 0.3s var(--spring),
+          opacity 0.2s ease;
+      }
+      .act:hover {
+        transform: translateY(-1px);
+      }
+      .act:active {
+        transform: translateY(0) scale(0.97);
+      }
+      .act.ok {
+        background: rgba(5, 150, 105, 0.12);
+        color: var(--ok);
+        border-color: rgba(5, 150, 105, 0.2);
+      }
+      .act.ok:hover {
+        background: rgba(5, 150, 105, 0.2);
+      }
+      .act.no {
+        background: rgba(190, 18, 60, 0.1);
+        color: var(--bad);
+        border-color: rgba(190, 18, 60, 0.18);
+      }
+      .act.no:hover {
+        background: rgba(190, 18, 60, 0.18);
+      }
+      .act.ghost {
+        background: rgba(17, 24, 39, 0.04);
+        color: var(--muted);
+        border-color: rgba(17, 24, 39, 0.08);
+      }
+      .act:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
       }
 
       .open {
@@ -338,112 +363,99 @@
         padding: 0;
         transition:
           background 0.2s var(--soft),
-          transform 0.35s var(--spring),
-          box-shadow 0.25s var(--soft);
+          transform 0.3s var(--spring);
       }
-      .bar:not(.has-domain) .open {
+      .bar:not(.has-domain):not(.has-review) .open {
         margin-left: 0;
       }
       .open:hover {
         background: #fff;
         transform: translateY(-1px) scale(1.04);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
-      }
-      .open:hover svg {
-        transform: translate(1px, -1px);
-      }
-      .open:active {
-        transform: translateY(0) scale(0.96);
       }
       .open svg {
         display: block;
         transition: transform 0.25s var(--spring);
       }
+      .open:hover svg {
+        transform: translate(1px, -1px);
+      }
 
       .bar.flash-allow,
       .bar.flash-review,
       .bar.flash-block {
-        animation: borderGlow 0.7s var(--soft);
+        animation: glow 0.65s var(--soft);
       }
-      @keyframes borderGlow {
-        0% {
+      @keyframes glow {
+        0%,
+        100% {
           box-shadow:
             inset 0 0 0 2px rgba(5, 150, 105, 0),
             0 10px 32px rgba(15, 23, 42, 0.14);
         }
-        25% {
+        30% {
           box-shadow:
             inset 0 0 0 2px rgba(5, 150, 105, 0.4),
             0 14px 36px rgba(15, 23, 42, 0.16);
         }
-        100% {
-          box-shadow:
-            inset 0 0 0 2px rgba(5, 150, 105, 0),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
       }
       .bar.flash-review {
-        animation-name: borderGlowWarn;
+        animation-name: glowWarn;
       }
       .bar.flash-block {
-        animation-name: borderGlowBad;
+        animation-name: glowBad;
       }
-      @keyframes borderGlowWarn {
-        0% {
-          box-shadow:
-            inset 0 0 0 2px rgba(217, 119, 6, 0),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
-        25% {
-          box-shadow:
-            inset 0 0 0 2px rgba(217, 119, 6, 0.42),
-            0 14px 36px rgba(15, 23, 42, 0.16);
-        }
+      @keyframes glowWarn {
+        0%,
         100% {
           box-shadow:
             inset 0 0 0 2px rgba(217, 119, 6, 0),
             0 10px 32px rgba(15, 23, 42, 0.14);
         }
-      }
-      @keyframes borderGlowBad {
-        0% {
+        30% {
           box-shadow:
-            inset 0 0 0 2px rgba(190, 18, 60, 0),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
-        25% {
-          box-shadow:
-            inset 0 0 0 2px rgba(190, 18, 60, 0.42),
+            inset 0 0 0 2px rgba(217, 119, 6, 0.45),
             0 14px 36px rgba(15, 23, 42, 0.16);
         }
+      }
+      @keyframes glowBad {
+        0%,
         100% {
           box-shadow:
             inset 0 0 0 2px rgba(190, 18, 60, 0),
             0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        30% {
+          box-shadow:
+            inset 0 0 0 2px rgba(190, 18, 60, 0.45),
+            0 14px 36px rgba(15, 23, 42, 0.16);
         }
       }
     </style>
   </head>
   <body>
     <div class="bar" id="bar">
-      <div class="light" id="light" title="Latest decision"></div>
+      <div class="light" id="light"></div>
       <div class="counts" id="counts">
-        <div class="count allow" data-k="allow" title="Allowed">
+        <div class="count allow" data-k="allow">
           <span class="n" id="n-allow">0</span>
           <span class="l">OK</span>
         </div>
-        <div class="count review" data-k="review" title="Pending">
+        <div class="count review" data-k="review">
           <span class="n" id="n-review">0</span>
           <span class="l">?</span>
         </div>
-        <div class="count block" data-k="block" title="Blocked">
+        <div class="count block" data-k="block">
           <span class="n" id="n-block">0</span>
           <span class="l">NO</span>
         </div>
       </div>
-      <div class="domain" id="domain" title="Open Aegis">
+      <div class="slot" id="slot">
         <span class="tag" id="tag"></span>
-        <span class="host" id="host"></span>
+        <span class="host" id="host" title="Open Aegis"></span>
+        <div class="acts" id="acts">
+          <button class="act ok" id="btn-allow" type="button">放行</button>
+          <button class="act no" id="btn-block" type="button">拦截</button>
+        </div>
       </div>
       <button class="open" id="btn-open" title="Open Aegis" aria-label="Open">
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -464,6 +476,7 @@
       }
       (function () {
         const LIVE_MS = 5000;
+        const REVIEW_MS = 30000; // wait longer when human/AI choice is needed
         const params = new URLSearchParams(location.search);
         const port = params.get("port") || "7832";
         const base = `http://127.0.0.1:${port}/api/v1`;
@@ -472,19 +485,23 @@
         const light = document.getElementById("light");
         const tag = document.getElementById("tag");
         const host = document.getElementById("host");
-        const domainEl = document.getElementById("domain");
+        const btnAllow = document.getElementById("btn-allow");
+        const btnBlock = document.getElementById("btn-block");
 
         let lastId = null;
         let hideTimer = null;
         let queue = [];
         let live = false;
+        let activeReviewId = null;
         const lastCounts = { allow: null, review: null, block: null };
+
+        function apiBridge() {
+          return window.aegisFloating || null;
+        }
 
         function setCompact(compact) {
           try {
-            if (window.aegisFloating && window.aegisFloating.setCompact) {
-              window.aegisFloating.setCompact(compact);
-            }
+            apiBridge()?.setCompact?.(compact);
           } catch {
             /* preview */
           }
@@ -498,13 +515,11 @@
         }
 
         function flash(decision) {
-          const cls = "flash-" + decision;
+          const cls = "flash-" + (decision || "allow");
           bar.classList.remove("flash-allow", "flash-review", "flash-block", "lift");
           void bar.offsetWidth;
           bar.classList.add(cls, "lift");
-          setTimeout(() => {
-            bar.classList.remove(cls, "lift");
-          }, 700);
+          setTimeout(() => bar.classList.remove(cls, "lift"), 700);
         }
 
         function bumpCount(key, value) {
@@ -520,57 +535,143 @@
           wrap.classList.add("bump");
         }
 
-        function showDomain(decision, hostname) {
+        function hideSlot() {
+          live = false;
+          activeReviewId = null;
+          bar.classList.remove("has-domain", "has-review");
+          setCompact(true);
+          // lock current position after animation — no jump
+          try {
+            apiBridge()?.lockAnchor?.();
+          } catch {
+            /* preview */
+          }
+        }
+
+        function showItem(item) {
           live = true;
+          const decision = item.decision;
+          const hostname = item.hostname || item.url;
+          activeReviewId = decision === "review" ? item.reviewId || item.id || null : null;
+
           setLight(decision);
           tag.className = "tag " + decision;
           tag.textContent = decision;
           host.textContent = hostname || "";
-          bar.classList.remove("has-domain");
-          void domainEl.offsetWidth;
-          // expand: spring width + delayed text fade-in (CSS)
+
+          bar.classList.remove("has-domain", "has-review");
+          void bar.getBoundingClientRect();
           requestAnimationFrame(() => {
-            bar.classList.add("has-domain");
+            if (decision === "review" && item.needsReview) {
+              bar.classList.add("has-review");
+            } else {
+              bar.classList.add("has-domain");
+            }
             setCompact(false);
+            try {
+              apiBridge()?.lockAnchor?.();
+            } catch {
+              /* preview */
+            }
           });
           flash(decision);
+
           clearTimeout(hideTimer);
+          const ms = item.needsReview ? REVIEW_MS : LIVE_MS;
           hideTimer = setTimeout(() => {
-            live = false;
-            bar.classList.remove("has-domain");
-            setCompact(true);
+            hideSlot();
             const next = queue.shift();
-            if (next) {
-              setTimeout(() => showDomain(next.decision, next.hostname), 280);
-            }
-          }, LIVE_MS);
+            if (next) setTimeout(() => showItem(next), 260);
+          }, ms);
         }
 
-        function pushDomain(decision, hostname) {
+        function pushItem(payload) {
           if (live) {
-            queue = queue.filter((q) => q.hostname !== hostname);
-            queue.unshift({ decision, hostname });
+            queue = queue.filter((q) => q.hostname !== payload.hostname);
+            queue.unshift(payload);
             if (queue.length > 4) queue.length = 4;
-            setLight(decision);
+            if (payload.decision) setLight(payload.decision);
             return;
           }
-          showDomain(decision, hostname);
+          showItem(payload);
         }
+
+        async function resolve(decision) {
+          const id = activeReviewId;
+          if (!id) return;
+          btnAllow.disabled = true;
+          btnBlock.disabled = true;
+          try {
+            const port2 = port;
+            await fetch(`http://127.0.0.1:${port2}/api/v1/reviews/${id}/resolve`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                decision,
+                by: "user",
+                alwaysAllow: decision === "allow",
+              }),
+            });
+            // brief confirmation state, then collapse — same window anchor
+            tag.className = "tag " + decision;
+            tag.textContent = decision;
+            setLight(decision);
+            flash(decision);
+            setTimeout(() => {
+              hideSlot();
+              const next = queue.shift();
+              if (next) setTimeout(() => showItem(next), 260);
+            }, 900);
+          } catch {
+            btnAllow.disabled = false;
+            btnBlock.disabled = false;
+          }
+        }
+
+        btnAllow.addEventListener("click", (e) => {
+          e.stopPropagation();
+          resolve("allow");
+        });
+        btnBlock.addEventListener("click", (e) => {
+          e.stopPropagation();
+          resolve("block");
+        });
 
         async function refresh() {
           try {
-            const [healthRes, histRes] = await Promise.all([
+            const [healthRes, histRes, revRes] = await Promise.all([
               fetch(base + "/health"),
               fetch(base + "/history?limit=5"),
+              fetch(base + "/reviews"),
             ]);
             const health = await healthRes.json();
             const hist = await histRes.json();
+            const rev = await revRes.json();
+
             bumpCount("allow", health?.stats?.allow ?? 0);
             bumpCount(
               "review",
-              health?.reviews?.pending ?? health?.stats?.review ?? 0,
+              rev?.stats?.pending ?? health?.reviews?.pending ?? health?.stats?.review ?? 0,
             );
             bumpCount("block", health?.stats?.block ?? 0);
+
+            // Pending reviews take priority on the float (human or AI can act)
+            const pending = rev?.items ?? [];
+            const p = pending[0];
+            if (p && p.id !== activeReviewId) {
+              const already =
+                live && host.textContent === (p.hostname || p.url) && bar.classList.contains("has-review");
+              if (!already) {
+                pushItem({
+                  decision: "review",
+                  needsReview: true,
+                  hostname: p.hostname || p.url,
+                  reviewId: p.id,
+                  id: p.id,
+                });
+              }
+              return;
+            }
 
             const items = hist?.items ?? [];
             const newest = items[0];
@@ -581,7 +682,12 @@
                 setCompact(true);
               } else {
                 lastId = newest.id;
-                pushDomain(newest.decision, newest.hostname || newest.url);
+                pushItem({
+                  decision: newest.decision,
+                  needsReview: false,
+                  hostname: newest.hostname || newest.url,
+                  id: newest.id,
+                });
               }
             }
           } catch {
@@ -590,30 +696,26 @@
         }
 
         function openMain() {
-          if (window.aegisFloating && window.aegisFloating.openMain) {
-            window.aegisFloating.openMain();
-          }
+          apiBridge()?.openMain?.();
         }
         document.getElementById("btn-open").onclick = openMain;
         document.getElementById("counts").onclick = openMain;
-        domainEl.onclick = openMain;
+        host.onclick = () => {
+          if (!bar.classList.contains("has-review")) openMain();
+        };
 
         refresh();
         setInterval(refresh, 2000);
 
         if (new URLSearchParams(location.search).get("demo") === "1") {
-          const demo = [
-            ["allow", "github.com"],
-            ["review", "unknown-partner.example"],
-            ["block", "guthub.com"],
-            ["allow", "raw.githubusercontent.com"],
-          ];
-          let i = 0;
           setInterval(() => {
-            const d = demo[i % demo.length];
-            i++;
-            pushDomain(d[0], d[1]);
-          }, 3800);
+            pushItem({
+              decision: "review",
+              needsReview: true,
+              hostname: "unknown-partner.example",
+              reviewId: "demo",
+            });
+          }, 8000);
         }
       })();
     </script>

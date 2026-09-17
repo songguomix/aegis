@@ -122,6 +122,7 @@ export interface EngineConfigView {
   vtCacheTtlMs: number;
   rdapTimeoutMs: number;
   httpPort: number;
+  soundEnabled?: boolean;
 }
 
 export interface ReviewItem {

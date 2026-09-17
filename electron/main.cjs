@@ -131,8 +131,8 @@ function createFloatingWindow() {
   const { screen } = require("electron");
   const display = screen.getPrimaryDisplay();
   const { workArea } = display;
-  const width = 250;
-  const height = 56;
+  const width = 228;
+  const height = 52;
 
   floatingWindow = new BrowserWindow({
     width,
@@ -245,8 +245,8 @@ ipcMain.on("aegis:float-anchor-lock", () => {
 ipcMain.on("aegis:float-size", (_e, compact) => {
   if (!floatingWindow || floatingWindow.isDestroyed()) return;
   floatCompact = Boolean(compact);
-  const targetWidth = floatCompact ? 250 : 440;
-  const height = 56;
+  const targetWidth = floatCompact ? 228 : 400;
+  const height = 52;
 
   // Stable visual center: use current center at animation start; never re-jump after.
   if (!floatAnchor) {

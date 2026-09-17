@@ -115,6 +115,7 @@ export interface EngineConfig {
   vtCacheTtlMs: number;
   rdapTimeoutMs: number;
   httpPort: number;
+  soundEnabled: boolean;
 }
 
 export const DEFAULT_CONFIG: EngineConfig = {
@@ -127,4 +128,5 @@ export const DEFAULT_CONFIG: EngineConfig = {
   vtCacheTtlMs: 6 * 60 * 60 * 1000,
   rdapTimeoutMs: 3000,
   httpPort: 7832,
+  soundEnabled: true,
 };

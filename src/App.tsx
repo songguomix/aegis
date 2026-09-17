@@ -962,6 +962,7 @@ export default function App() {
                           enableRdap: config.enableRdap,
                           allowlist: config.allowlist,
                           denylist: config.denylist,
+                          soundEnabled: config.soundEnabled !== false,
                         })
                       }
                     >

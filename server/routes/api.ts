@@ -36,6 +36,7 @@ const configSchema = z.object({
   enableRdap: z.boolean().optional(),
   allowlist: z.array(z.string()).optional(),
   denylist: z.array(z.string()).optional(),
+  soundEnabled: z.boolean().optional(),
 });
 
 function resolveMcpEntry(): string {
@@ -52,6 +53,7 @@ export function createApiRouter(): express.Router {
   const router = express.Router();
 
   router.get("/health", (_req, res) => {
+    const cfg = getConfig();
     res.json({
       ok: true,
       service: "aegis",
@@ -60,7 +62,8 @@ export function createApiRouter(): express.Router {
       reviews: reviewStats(),
       vtCache: vtCacheSize(),
       intelFeeds: intelFeedStatus(),
-      policyMode: getConfig().policyMode,
+      policyMode: cfg.policyMode,
+      soundEnabled: cfg.soundEnabled !== false,
     });
   });
 
@@ -346,6 +349,7 @@ export function createApiRouter(): express.Router {
         ? `${cfg.vtApiKey.slice(0, 4)}…${cfg.vtApiKey.slice(-2)}`
         : null,
       hasVtKey: Boolean(cfg.vtApiKey),
+      soundEnabled: cfg.soundEnabled !== false,
     });
   });
 
@@ -368,6 +372,7 @@ export function createApiRouter(): express.Router {
         ? `${cfg.vtApiKey.slice(0, 4)}…${cfg.vtApiKey.slice(-2)}`
         : null,
       hasVtKey: Boolean(cfg.vtApiKey),
+      soundEnabled: cfg.soundEnabled !== false,
     });
   });
 

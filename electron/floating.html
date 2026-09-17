@@ -164,9 +164,9 @@
         cursor: pointer;
       }
       .count {
-        min-width: 38px;
-        padding: 3px 6px;
-        border-radius: 9px;
+        min-width: 36px;
+        padding: 2px 6px;
+        border-radius: 8px;
         text-align: center;
         transition: background 0.2s var(--soft);
       }
@@ -175,19 +175,19 @@
       }
       .count .n {
         display: block;
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 700;
         letter-spacing: -0.02em;
-        line-height: 1.1;
+        line-height: 1.15;
         font-variant-numeric: tabular-nums;
       }
       .count .l {
         display: block;
-        font-size: 9px;
+        font-size: 8px;
         font-weight: 650;
         color: var(--muted);
         line-height: 1;
-        margin-top: 1px;
+        margin-top: 0;
         text-transform: uppercase;
       }
       .count.allow .n {
@@ -301,9 +301,9 @@
         -webkit-app-region: no-drag;
         appearance: none;
         border: 1px solid transparent;
-        height: 26px;
-        padding: 0 10px;
-        border-radius: 8px;
+        height: 24px;
+        padding: 0 8px;
+        border-radius: 7px;
         font-size: 11px;
         font-weight: 650;
         cursor: pointer;
@@ -367,33 +367,6 @@
       }
       .bar:not(.has-domain):not(.has-review) .open {
         margin-left: 0;
-      }
-      .sound {
-        -webkit-app-region: no-drag;
-        flex-shrink: 0;
-        appearance: none;
-        border: 1px solid rgba(17, 24, 39, 0.08);
-        width: 28px;
-        height: 28px;
-        border-radius: 9px;
-        background: rgba(255, 255, 255, 0.72);
-        cursor: pointer;
-        display: grid;
-        place-items: center;
-        padding: 0;
-        font-size: 12px;
-        line-height: 1;
-        transition:
-          background 0.2s var(--soft),
-          transform 0.3s var(--spring),
-          opacity 0.2s ease;
-      }
-      .sound:hover {
-        background: #fff;
-        transform: translateY(-1px);
-      }
-      .sound.off {
-        opacity: 0.4;
       }
       .open:hover {
         background: #fff;
@@ -484,7 +457,6 @@
           <button class="act no" id="btn-block" type="button">拦截</button>
         </div>
       </div>
-      <button class="sound" id="btn-sound" title="Sound on/off" aria-label="Sound">🔔</button>
       <button class="open" id="btn-open" title="Open Aegis" aria-label="Open">
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path
@@ -676,19 +648,12 @@
           resolve("block");
         });
 
-        const btnSound = document.getElementById("btn-sound");
-        function paintSound() {
-          const on = window.AegisSound ? window.AegisSound.isEnabled() : true;
-          btnSound.classList.toggle("off", !on);
-          btnSound.textContent = on ? "🔔" : "🔕";
-          btnSound.title = on ? "Sound on (click to mute)" : "Sound off (click to enable)";
+        // Sound is controlled in the main app Settings (not on the float)
+        function syncSoundFromServer(on) {
+          if (window.AegisSound && typeof on === "boolean") {
+            window.AegisSound.setEnabled(on);
+          }
         }
-        btnSound.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (window.AegisSound) window.AegisSound.setEnabled(!window.AegisSound.isEnabled());
-          paintSound();
-        });
-        paintSound();
 
         async function refresh() {
           try {
@@ -707,6 +672,7 @@
               rev?.stats?.pending ?? health?.reviews?.pending ?? health?.stats?.review ?? 0,
             );
             bumpCount("block", health?.stats?.block ?? 0);
+            syncSoundFromServer(health?.soundEnabled !== false);
 
             // Pending reviews take priority on the float (human or AI can act)
             const pending = rev?.items ?? [];

@@ -15,11 +15,8 @@
         --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
           "PingFang SC", sans-serif;
       }
-      * {
-        box-sizing: border-box;
-      }
-      html,
-      body {
+      * { box-sizing: border-box; }
+      html, body {
         margin: 0;
         min-height: 100%;
         font-family: var(--font);
@@ -46,10 +43,10 @@
         height: 100%;
         min-height: 52px;
         display: grid;
-        grid-template-columns: 14px auto minmax(0, 1fr) auto;
+        grid-template-columns: 12px auto minmax(0, 1fr) 28px;
         align-items: center;
-        gap: 10px;
-        padding: 8px 10px 8px 12px;
+        gap: 8px 10px;
+        padding: 8px 8px 8px 12px;
         border-radius: 18px;
         background: rgba(255, 255, 255, 0.78);
         border: 1px solid rgba(255, 255, 255, 0.9);
@@ -58,11 +55,10 @@
           0 10px 32px rgba(15, 23, 42, 0.14);
         backdrop-filter: blur(28px) saturate(170%);
         -webkit-backdrop-filter: blur(28px) saturate(170%);
-        transition: box-shadow 0.35s ease;
       }
 
       body.preview .bar {
-        width: min(440px, 92vw);
+        width: min(460px, 94vw);
         height: 56px;
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.95),
@@ -70,16 +66,12 @@
       }
 
       .light {
-        width: 12px;
-        height: 12px;
+        width: 11px;
+        height: 11px;
         border-radius: 50%;
         background: #a3a3a3;
         box-shadow: 0 0 0 3px rgba(163, 163, 163, 0.16);
-        flex-shrink: 0;
-        transition:
-          background 0.25s ease,
-          box-shadow 0.25s ease,
-          transform 0.25s ease;
+        transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
       }
       .light.allow {
         background: var(--ok);
@@ -93,19 +85,11 @@
         background: var(--bad);
         box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.18);
       }
-      .light.pulse {
-        animation: pulse 0.7s ease;
-      }
+      .light.pulse { animation: pulse 0.55s ease; }
       @keyframes pulse {
-        0% {
-          transform: scale(0.85);
-        }
-        55% {
-          transform: scale(1.25);
-        }
-        100% {
-          transform: scale(1);
-        }
+        0% { transform: scale(0.85); }
+        55% { transform: scale(1.22); }
+        100% { transform: scale(1); }
       }
 
       .counts {
@@ -116,21 +100,20 @@
         padding: 3px;
         border-radius: 12px;
         background: rgba(17, 24, 39, 0.04);
+        flex-shrink: 0;
       }
       .count {
-        min-width: 44px;
-        padding: 3px 8px;
+        min-width: 40px;
+        padding: 3px 7px;
         border-radius: 9px;
         text-align: center;
         cursor: pointer;
         transition: background 0.15s ease;
       }
-      .count:hover {
-        background: rgba(255, 255, 255, 0.85);
-      }
+      .count:hover { background: rgba(255, 255, 255, 0.85); }
       .count .n {
         display: block;
-        font-size: 14px;
+        font-size: 13.5px;
         font-weight: 700;
         letter-spacing: -0.02em;
         line-height: 1.1;
@@ -146,100 +129,70 @@
         line-height: 1;
         margin-top: 1px;
       }
-      .count.allow .n {
-        color: var(--ok);
-      }
-      .count.review .n {
-        color: var(--warn);
-      }
-      .count.block .n {
-        color: var(--bad);
-      }
+      .count.allow .n { color: var(--ok); }
+      .count.review .n { color: var(--warn); }
+      .count.block .n { color: var(--bad); }
 
-      /* Right slot: idle label vs live toast */
-      .slot {
-        min-width: 0;
+      /* Right: full-width domain ticker — always filled */
+      .ticker {
         -webkit-app-region: no-drag;
-        position: relative;
+        min-width: 0;
         height: 100%;
+        position: relative;
         overflow: hidden;
+        border-radius: 12px;
+        background: rgba(17, 24, 39, 0.035);
+        cursor: pointer;
       }
 
-      .idle,
-      .live {
+      .ticker-item {
         position: absolute;
         inset: 0;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: flex-end;
-        text-align: right;
-        transition:
-          opacity 0.35s ease,
-          transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-        pointer-events: none;
-      }
-
-      .idle {
-        opacity: 1;
-        transform: translateY(0);
-      }
-      .idle .label {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--muted);
-        letter-spacing: 0.02em;
-      }
-      .idle .hint {
-        font-size: 10px;
-        color: #a3a3a3;
-        margin-top: 1px;
-      }
-
-      .live {
-        opacity: 0;
-        transform: translateY(8px);
-        pointer-events: none;
-      }
-      .bar.is-live .idle {
-        opacity: 0;
-        transform: translateY(-6px);
-      }
-      .bar.is-live .live {
-        opacity: 1;
-        transform: translateY(0);
-      }
-
-      .live .line1 {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
         align-items: center;
-        justify-content: flex-end;
-        gap: 6px;
-        min-width: 0;
-        max-width: 100%;
+        gap: 8px;
+        padding: 0 12px;
+        opacity: 0;
+        transform: translateX(28px);
+        transition:
+          opacity 0.32s ease,
+          transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+        pointer-events: none;
       }
-      .live .verdict {
+      .ticker-item.in {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      .ticker-item.out {
+        opacity: 0;
+        transform: translateX(-22px);
+      }
+
+      .tag {
         flex-shrink: 0;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        padding: 1px 6px;
+        padding: 2px 6px;
         border-radius: 5px;
+        line-height: 1.2;
       }
-      .verdict.allow {
+      .tag.allow {
         color: var(--ok);
         background: rgba(5, 150, 105, 0.12);
       }
-      .verdict.review {
+      .tag.review {
         color: var(--warn);
         background: rgba(217, 119, 6, 0.12);
       }
-      .verdict.block {
+      .tag.block {
         color: var(--bad);
         background: rgba(190, 18, 60, 0.12);
       }
-      .live .host {
+
+      .host {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -249,98 +202,54 @@
         font-weight: 600;
         color: var(--text);
       }
-      .live .sub {
-        margin-top: 1px;
-        font-size: 10.5px;
-        color: var(--muted);
-        line-height: 1.2;
-      }
 
       .open {
         -webkit-app-region: no-drag;
         appearance: none;
         border: 1px solid rgba(17, 24, 39, 0.08);
-        width: 30px;
-        height: 30px;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.7);
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.72);
         color: #404040;
         cursor: pointer;
         display: grid;
         place-items: center;
-        transition:
-          background 0.15s ease,
-          transform 0.15s ease;
+        transition: background 0.15s ease, transform 0.15s ease;
         padding: 0;
       }
       .open:hover {
         background: #fff;
         transform: translateY(-1px);
       }
-      .open:active {
-        transform: translateY(0);
-      }
-      .open svg {
-        display: block;
-      }
+      .open svg { display: block; }
 
-      .bar.flash-allow {
-        animation: flashOk 0.55s ease;
-      }
-      .bar.flash-review {
-        animation: flashWarn 0.55s ease;
-      }
-      .bar.flash-block {
-        animation: flashBad 0.55s ease;
-      }
+      .bar.flash-allow { animation: flashOk 0.45s ease; }
+      .bar.flash-review { animation: flashWarn 0.45s ease; }
+      .bar.flash-block { animation: flashBad 0.45s ease; }
       @keyframes flashOk {
-        0% {
-          box-shadow:
-            inset 0 0 0 2px rgba(5, 150, 105, 0.5),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
-        100% {
-          box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.95),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
+        0% { box-shadow: inset 0 0 0 2px rgba(5, 150, 105, 0.45), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
       }
       @keyframes flashWarn {
-        0% {
-          box-shadow:
-            inset 0 0 0 2px rgba(217, 119, 6, 0.5),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
-        100% {
-          box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.95),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
+        0% { box-shadow: inset 0 0 0 2px rgba(217, 119, 6, 0.45), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
       }
       @keyframes flashBad {
-        0% {
-          box-shadow:
-            inset 0 0 0 2px rgba(190, 18, 60, 0.5),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
-        100% {
-          box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.95),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
+        0% { box-shadow: inset 0 0 0 2px rgba(190, 18, 60, 0.45), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
       }
     </style>
   </head>
   <body>
     <div class="bar" id="bar">
-      <div class="light" id="light" title="Last decision"></div>
-
+      <div class="light" id="light" title="Latest decision"></div>
       <div class="counts" id="counts">
         <div class="count allow" title="Allowed">
           <span class="n" id="n-allow">0</span>
           <span class="l">OK</span>
         </div>
-        <div class="count review" title="Pending review">
+        <div class="count review" title="Pending">
           <span class="n" id="n-review">0</span>
           <span class="l">?</span>
         </div>
@@ -349,30 +258,10 @@
           <span class="l">NO</span>
         </div>
       </div>
-
-      <div class="slot" id="slot">
-        <div class="idle" id="idle">
-          <div class="label" id="idle-label">Aegis</div>
-          <div class="hint" id="idle-hint">drag to move</div>
-        </div>
-        <div class="live" id="live">
-          <div class="line1">
-            <span class="verdict" id="verdict"></span>
-            <span class="host" id="host"></span>
-          </div>
-          <div class="sub" id="sub"></div>
-        </div>
-      </div>
-
+      <div class="ticker" id="ticker" title="Open Aegis"></div>
       <button class="open" id="btn-open" title="Open Aegis" aria-label="Open">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path
-            d="M4 10L10 4M10 4H5.5M10 4V8.5"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M4 10L10 4M10 4H5.5M10 4V8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
     </div>
@@ -382,25 +271,21 @@
         document.body.classList.add("preview");
       }
       (function () {
-        const LIVE_MS = 5000;
+        const HOLD_MS = 3200;
+        const CYCLE_MS = 2200;
         const params = new URLSearchParams(location.search);
         const port = params.get("port") || "7832";
         const base = `http://127.0.0.1:${port}/api/v1`;
 
         const bar = document.getElementById("bar");
         const light = document.getElementById("light");
-        const verdict = document.getElementById("verdict");
-        const hostEl = document.getElementById("host");
-        const subEl = document.getElementById("sub");
-        const idleLabel = document.getElementById("idle-label");
-        const idleHint = document.getElementById("idle-hint");
+        const ticker = document.getElementById("ticker");
 
+        let queue = []; // {decision, host}
+        let current = null;
+        let currentEl = null;
         let lastId = null;
-        let liveTimer = null;
-        let flashTimer = null;
-        let pending = null;
-        let queue = [];
-        let showing = false;
+        let seenIds = new Set();
 
         function setLight(decision) {
           light.className = "light " + (decision || "");
@@ -408,52 +293,70 @@
           light.classList.add("pulse");
         }
 
-        function enterIdle() {
-          bar.classList.remove("is-live");
-          bar.classList.remove("flash-allow", "flash-review", "flash-block");
-          idleLabel.textContent = "Aegis";
-        }
-
-        function enterLive(decision, hostname, label) {
-          setLight(decision);
-          verdict.className = "verdict " + decision;
-          verdict.textContent = decision;
-          hostEl.textContent = hostname || "";
-          subEl.textContent = label;
-          bar.classList.add("is-live");
+        function flash(decision) {
           bar.classList.remove("flash-allow", "flash-review", "flash-block");
           void bar.offsetWidth;
           bar.classList.add("flash-" + decision);
-
-          clearTimeout(liveTimer);
-          liveTimer = setTimeout(() => {
-            showing = false;
-            enterIdle();
-            // dequeue next toast if any
-            const next = queue.shift();
-            if (next) {
-              showing = true;
-              enterLive(next.decision, next.hostname, next.label);
-            }
-          }, LIVE_MS);
+          setTimeout(() => {
+            bar.classList.remove("flash-allow", "flash-review", "flash-block");
+          }, 480);
         }
 
-        function showToast(decision, hostname, label) {
-          if (showing) {
-            queue = queue.filter((q) => q.hostname !== hostname);
-            queue.push({ decision, hostname, label });
-            if (queue.length > 3) queue = queue.slice(-3);
-            return;
+        function createItem(decision, host) {
+          const el = document.createElement("div");
+          el.className = "ticker-item";
+          el.innerHTML =
+            '<span class="tag ' +
+            decision +
+            '"></span><span class="host"></span>';
+          el.querySelector(".tag").textContent = decision;
+          el.querySelector(".host").textContent = host;
+          return el;
+        }
+
+        function showNext() {
+          if (!queue.length) {
+            // keep cycling the last domain instead of leaving empty space
+            if (current) {
+              queue.push(current);
+            } else {
+              queue.push({ decision: "ok", host: "Aegis · waiting" });
+            }
           }
-          showing = true;
-          enterLive(decision, hostname, label);
+          const next = queue.shift();
+          const el = createItem(next.decision, next.host);
+          ticker.appendChild(el);
+          const prevEl = currentEl;
+          requestAnimationFrame(() => {
+            el.classList.add("in");
+            if (prevEl) {
+              prevEl.classList.add("out");
+              setTimeout(() => prevEl.remove(), 400);
+            }
+          });
+          currentEl = el;
+          current = next;
+          if (next.decision !== "ok") setLight(next.decision);
+        }
+
+        function enqueue(decision, host) {
+          const item = { decision, host };
+          // newest first for immediacy; avoid dupes
+          queue = queue.filter((q) => q.host !== host);
+          queue.unshift(item);
+          if (queue.length > 8) queue = queue.slice(0, 8);
+          flash(decision);
+          // interrupt empty wait: if ticker is placeholder, show now
+          if (!current || current.host === "Aegis · waiting") {
+            // force cycle soon
+          }
         }
 
         async function refresh() {
           try {
             const [healthRes, histRes] = await Promise.all([
               fetch(base + "/health"),
-              fetch(base + "/history?limit=1"),
+              fetch(base + "/history?limit=12"),
             ]);
             const health = await healthRes.json();
             const hist = await histRes.json();
@@ -467,28 +370,32 @@
               health?.stats?.block ?? 0,
             );
 
-            const item = hist?.items?.[0];
-            if (item && item.id !== lastId) {
+            const items = hist?.items ?? [];
+            for (const item of items) {
+              if (!item || seenIds.has(item.id)) continue;
+              seenIds.add(item.id);
+              if (!lastId) {
+                // first load: fill ticker with recent hosts (oldest → newest for cycle)
+                for (const h of [...items].reverse()) {
+                  if (h?.hostname) {
+                    queue.push({ decision: h.decision, host: h.hostname });
+                    seenIds.add(h.id);
+                  }
+                }
+                if (queue.length) {
+                  lastId = items[0].id;
+                  setLight(items[0].decision);
+                }
+                break;
+              }
+              enqueue(item.decision, item.hostname || item.url);
               lastId = item.id;
-              const label =
-                item.decision === "allow"
-                  ? "passed"
-                  : item.decision === "block"
-                    ? "blocked"
-                    : "needs review";
-              // update light immediately; show domain for 5s
-              showToast(
-                item.decision,
-                item.hostname || item.url,
-                label + " · " + new Date(item.checkedAt).toLocaleTimeString(),
-              );
             }
-
-            if (!showing) {
-              idleHint.textContent = health?.ok ? "monitoring" : "connecting";
+            if (!seenIds.size && items[0]) {
+              lastId = items[0].id;
             }
           } catch {
-            if (!showing) idleHint.textContent = "connecting";
+            /* keep last ticker content */
           }
         }
 
@@ -497,30 +404,28 @@
             window.aegisFloating.openMain();
           }
         }
-
         document.getElementById("btn-open").onclick = openMain;
         document.getElementById("counts").onclick = openMain;
-        document.getElementById("slot").onclick = openMain;
+        ticker.onclick = openMain;
 
-        // Preview demo: cycle a fake toast so browser preview shows behavior
-        if (new URLSearchParams(location.search).get("demo") === "1") {
-          const demo = [
-            ["allow", "github.com", "passed"],
-            ["review", "new-site.example", "needs review"],
-            ["block", "guthub.com", "blocked"],
-          ];
-          let i = 0;
-          lastId = "seed";
-          setInterval(() => {
-            const d = demo[i % demo.length];
-            i++;
-            showToast(d[0], d[1], d[2]);
-          }, 7000);
-          showToast(demo[0][0], demo[0][1], demo[0][2]);
-        }
-
+        // Always slide domains — never leave the right side blank
+        showNext();
+        setInterval(showNext, CYCLE_MS);
         refresh();
         setInterval(refresh, 2000);
+
+        if (new URLSearchParams(location.search).get("demo") === "1") {
+          setInterval(() => {
+            const demo = [
+              ["allow", "github.com"],
+              ["allow", "pypi.org"],
+              ["review", "new-site.example"],
+              ["block", "guthub.com"],
+            ];
+            const d = demo[Math.floor(Math.random() * demo.length)];
+            enqueue(d[0], d[1]);
+          }, 4000);
+        }
       })();
     </script>
   </body>

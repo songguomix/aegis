@@ -15,8 +15,11 @@
         --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
           "PingFang SC", sans-serif;
       }
-      * { box-sizing: border-box; }
-      html, body {
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
         margin: 0;
         min-height: 100%;
         font-family: var(--font);
@@ -27,7 +30,6 @@
         overflow: hidden;
         user-select: none;
       }
-      /* Preview shell only (browser demo) */
       body.preview {
         background:
           radial-gradient(800px 400px at 50% 0%, rgba(99, 102, 241, 0.12), transparent 60%),
@@ -36,7 +38,6 @@
         display: grid;
         place-items: start center;
         padding-top: 28px;
-        user-select: none;
       }
 
       .bar {
@@ -57,17 +58,17 @@
           0 10px 32px rgba(15, 23, 42, 0.14);
         backdrop-filter: blur(28px) saturate(170%);
         -webkit-backdrop-filter: blur(28px) saturate(170%);
+        transition: box-shadow 0.35s ease;
       }
 
       body.preview .bar {
-        width: min(420px, 92vw);
+        width: min(440px, 92vw);
         height: 56px;
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.95),
           0 16px 40px rgba(15, 23, 42, 0.16);
       }
 
-      /* Left status light */
       .light {
         width: 12px;
         height: 12px;
@@ -75,6 +76,10 @@
         background: #a3a3a3;
         box-shadow: 0 0 0 3px rgba(163, 163, 163, 0.16);
         flex-shrink: 0;
+        transition:
+          background 0.25s ease,
+          box-shadow 0.25s ease,
+          transform 0.25s ease;
       }
       .light.allow {
         background: var(--ok);
@@ -89,80 +94,20 @@
         box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.18);
       }
       .light.pulse {
-        animation: pulse 0.9s ease;
+        animation: pulse 0.7s ease;
       }
       @keyframes pulse {
-        0% { transform: scale(0.85); }
-        55% { transform: scale(1.2); }
-        100% { transform: scale(1); }
+        0% {
+          transform: scale(0.85);
+        }
+        55% {
+          transform: scale(1.25);
+        }
+        100% {
+          transform: scale(1);
+        }
       }
 
-      /* Right: last site */
-      .msg {
-        min-width: 0;
-        -webkit-app-region: no-drag;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        justify-content: center;
-        gap: 1px;
-        height: 100%;
-        text-align: right;
-      }
-      .msg .line1 {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 6px;
-        min-width: 0;
-        max-width: 100%;
-        font-size: 12.5px;
-        font-weight: 600;
-        color: var(--text);
-        line-height: 1.2;
-      }
-      .msg .verdict {
-        flex-shrink: 0;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        padding: 1px 6px;
-        border-radius: 5px;
-      }
-      .verdict.allow {
-        color: var(--ok);
-        background: rgba(5, 150, 105, 0.12);
-      }
-      .verdict.review {
-        color: var(--warn);
-        background: rgba(217, 119, 6, 0.12);
-      }
-      .verdict.block {
-        color: var(--bad);
-        background: rgba(190, 18, 60, 0.12);
-      }
-      .msg .host {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--text);
-      }
-      .msg .sub {
-        font-size: 10.5px;
-        color: var(--muted);
-        line-height: 1.2;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-      }
-
-      /* Counts */
       .counts {
         -webkit-app-region: no-drag;
         display: flex;
@@ -201,11 +146,116 @@
         line-height: 1;
         margin-top: 1px;
       }
-      .count.allow .n { color: var(--ok); }
-      .count.review .n { color: var(--warn); }
-      .count.block .n { color: var(--bad); }
+      .count.allow .n {
+        color: var(--ok);
+      }
+      .count.review .n {
+        color: var(--warn);
+      }
+      .count.block .n {
+        color: var(--bad);
+      }
 
-      /* Open button — clean chevron in a soft square */
+      /* Right slot: idle label vs live toast */
+      .slot {
+        min-width: 0;
+        -webkit-app-region: no-drag;
+        position: relative;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .idle,
+      .live {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-end;
+        text-align: right;
+        transition:
+          opacity 0.35s ease,
+          transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        pointer-events: none;
+      }
+
+      .idle {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .idle .label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+      .idle .hint {
+        font-size: 10px;
+        color: #a3a3a3;
+        margin-top: 1px;
+      }
+
+      .live {
+        opacity: 0;
+        transform: translateY(8px);
+        pointer-events: none;
+      }
+      .bar.is-live .idle {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      .bar.is-live .live {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .live .line1 {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .live .verdict {
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 1px 6px;
+        border-radius: 5px;
+      }
+      .verdict.allow {
+        color: var(--ok);
+        background: rgba(5, 150, 105, 0.12);
+      }
+      .verdict.review {
+        color: var(--warn);
+        background: rgba(217, 119, 6, 0.12);
+      }
+      .verdict.block {
+        color: var(--bad);
+        background: rgba(190, 18, 60, 0.12);
+      }
+      .live .host {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .live .sub {
+        margin-top: 1px;
+        font-size: 10.5px;
+        color: var(--muted);
+        line-height: 1.2;
+      }
+
       .open {
         -webkit-app-region: no-drag;
         appearance: none;
@@ -218,7 +268,9 @@
         cursor: pointer;
         display: grid;
         place-items: center;
-        transition: background 0.15s ease, transform 0.15s ease;
+        transition:
+          background 0.15s ease,
+          transform 0.15s ease;
         padding: 0;
       }
       .open:hover {
@@ -232,27 +284,57 @@
         display: block;
       }
 
-      /* Flash strip when new decision arrives */
-      .bar.flash-allow { animation: flashOk 0.7s ease; }
-      .bar.flash-review { animation: flashWarn 0.7s ease; }
-      .bar.flash-block { animation: flashBad 0.7s ease; }
+      .bar.flash-allow {
+        animation: flashOk 0.55s ease;
+      }
+      .bar.flash-review {
+        animation: flashWarn 0.55s ease;
+      }
+      .bar.flash-block {
+        animation: flashBad 0.55s ease;
+      }
       @keyframes flashOk {
-        0% { box-shadow: inset 0 0 0 2px rgba(5, 150, 105, 0.55), 0 10px 32px rgba(15, 23, 42, 0.14); }
-        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        0% {
+          box-shadow:
+            inset 0 0 0 2px rgba(5, 150, 105, 0.5),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        100% {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
       }
       @keyframes flashWarn {
-        0% { box-shadow: inset 0 0 0 2px rgba(217, 119, 6, 0.55), 0 10px 32px rgba(15, 23, 42, 0.14); }
-        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        0% {
+          box-shadow:
+            inset 0 0 0 2px rgba(217, 119, 6, 0.5),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        100% {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
       }
       @keyframes flashBad {
-        0% { box-shadow: inset 0 0 0 2px rgba(190, 18, 60, 0.55), 0 10px 32px rgba(15, 23, 42, 0.14); }
-        100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 10px 32px rgba(15, 23, 42, 0.14); }
+        0% {
+          box-shadow:
+            inset 0 0 0 2px rgba(190, 18, 60, 0.5),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        100% {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
       }
     </style>
   </head>
   <body>
     <div class="bar" id="bar">
       <div class="light" id="light" title="Last decision"></div>
+
       <div class="counts" id="counts">
         <div class="count allow" title="Allowed">
           <span class="n" id="n-allow">0</span>
@@ -267,16 +349,30 @@
           <span class="l">NO</span>
         </div>
       </div>
-      <div class="msg">
-        <div class="line1">
-          <span class="verdict" id="verdict" hidden></span>
-          <span class="host" id="host">Aegis</span>
+
+      <div class="slot" id="slot">
+        <div class="idle" id="idle">
+          <div class="label" id="idle-label">Aegis</div>
+          <div class="hint" id="idle-hint">drag to move</div>
         </div>
-        <div class="sub" id="sub">Monitoring · drag to move</div>
+        <div class="live" id="live">
+          <div class="line1">
+            <span class="verdict" id="verdict"></span>
+            <span class="host" id="host"></span>
+          </div>
+          <div class="sub" id="sub"></div>
+        </div>
       </div>
+
       <button class="open" id="btn-open" title="Open Aegis" aria-label="Open">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M4 10L10 4M10 4H5.5M10 4V8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path
+            d="M4 10L10 4M10 4H5.5M10 4V8.5"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
       </button>
     </div>
@@ -286,41 +382,71 @@
         document.body.classList.add("preview");
       }
       (function () {
-        const isElectron = !document.body.classList.contains("preview");
+        const LIVE_MS = 5000;
         const params = new URLSearchParams(location.search);
-        const port =
-          params.get("port") ||
-          (window.aegisFloat && window.aegisFloat.port) ||
-          "7832";
+        const port = params.get("port") || "7832";
         const base = `http://127.0.0.1:${port}/api/v1`;
 
+        const bar = document.getElementById("bar");
         const light = document.getElementById("light");
         const verdict = document.getElementById("verdict");
         const hostEl = document.getElementById("host");
         const subEl = document.getElementById("sub");
-        const bar = document.getElementById("bar");
-        let lastId = null;
-        let flashTimer = null;
+        const idleLabel = document.getElementById("idle-label");
+        const idleHint = document.getElementById("idle-hint");
 
-        function setDecision(decision, hostname, note) {
+        let lastId = null;
+        let liveTimer = null;
+        let flashTimer = null;
+        let pending = null;
+        let queue = [];
+        let showing = false;
+
+        function setLight(decision) {
           light.className = "light " + (decision || "");
-          // retrigger pulse
           void light.offsetWidth;
           light.classList.add("pulse");
-          verdict.hidden = !decision;
-          if (decision) {
-            verdict.className = "verdict " + decision;
-            verdict.textContent = decision;
-          }
-          hostEl.textContent = hostname || "Aegis";
-          subEl.textContent = note || "Monitoring · drag to move";
+        }
+
+        function enterIdle() {
+          bar.classList.remove("is-live");
+          bar.classList.remove("flash-allow", "flash-review", "flash-block");
+          idleLabel.textContent = "Aegis";
+        }
+
+        function enterLive(decision, hostname, label) {
+          setLight(decision);
+          verdict.className = "verdict " + decision;
+          verdict.textContent = decision;
+          hostEl.textContent = hostname || "";
+          subEl.textContent = label;
+          bar.classList.add("is-live");
           bar.classList.remove("flash-allow", "flash-review", "flash-block");
           void bar.offsetWidth;
           bar.classList.add("flash-" + decision);
-          clearTimeout(flashTimer);
-          flashTimer = setTimeout(() => {
-            bar.classList.remove("flash-allow", "flash-review", "flash-block");
-          }, 700);
+
+          clearTimeout(liveTimer);
+          liveTimer = setTimeout(() => {
+            showing = false;
+            enterIdle();
+            // dequeue next toast if any
+            const next = queue.shift();
+            if (next) {
+              showing = true;
+              enterLive(next.decision, next.hostname, next.label);
+            }
+          }, LIVE_MS);
+        }
+
+        function showToast(decision, hostname, label) {
+          if (showing) {
+            queue = queue.filter((q) => q.hostname !== hostname);
+            queue.push({ decision, hostname, label });
+            if (queue.length > 3) queue = queue.slice(-3);
+            return;
+          }
+          showing = true;
+          enterLive(decision, hostname, label);
         }
 
         async function refresh() {
@@ -331,12 +457,15 @@
             ]);
             const health = await healthRes.json();
             const hist = await histRes.json();
-            document.getElementById("n-allow").textContent =
-              String(health?.stats?.allow ?? 0);
-            document.getElementById("n-review").textContent =
-              String(health?.reviews?.pending ?? health?.stats?.review ?? 0);
-            document.getElementById("n-block").textContent =
-              String(health?.stats?.block ?? 0);
+            document.getElementById("n-allow").textContent = String(
+              health?.stats?.allow ?? 0,
+            );
+            document.getElementById("n-review").textContent = String(
+              health?.reviews?.pending ?? health?.stats?.review ?? 0,
+            );
+            document.getElementById("n-block").textContent = String(
+              health?.stats?.block ?? 0,
+            );
 
             const item = hist?.items?.[0];
             if (item && item.id !== lastId) {
@@ -347,20 +476,19 @@
                   : item.decision === "block"
                     ? "blocked"
                     : "needs review";
-              setDecision(
+              // update light immediately; show domain for 5s
+              showToast(
                 item.decision,
                 item.hostname || item.url,
                 label + " · " + new Date(item.checkedAt).toLocaleTimeString(),
               );
-            } else if (!item && lastId === null) {
-              hostEl.textContent = "Aegis";
-              subEl.textContent =
-                "Monitoring · " +
-                (health?.ok ? "connected" : "connecting") +
-                " · drag to move";
+            }
+
+            if (!showing) {
+              idleHint.textContent = health?.ok ? "monitoring" : "connecting";
             }
           } catch {
-            subEl.textContent = "Connecting…";
+            if (!showing) idleHint.textContent = "connecting";
           }
         }
 
@@ -372,7 +500,24 @@
 
         document.getElementById("btn-open").onclick = openMain;
         document.getElementById("counts").onclick = openMain;
-        document.querySelector(".msg").onclick = openMain;
+        document.getElementById("slot").onclick = openMain;
+
+        // Preview demo: cycle a fake toast so browser preview shows behavior
+        if (new URLSearchParams(location.search).get("demo") === "1") {
+          const demo = [
+            ["allow", "github.com", "passed"],
+            ["review", "new-site.example", "needs review"],
+            ["block", "guthub.com", "blocked"],
+          ];
+          let i = 0;
+          lastId = "seed";
+          setInterval(() => {
+            const d = demo[i % demo.length];
+            i++;
+            showToast(d[0], d[1], d[2]);
+          }, 7000);
+          showToast(demo[0][0], demo[0][1], demo[0][2]);
+        }
 
         refresh();
         setInterval(refresh, 2000);

@@ -6,6 +6,7 @@ const http = require("http");
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 let mainWindow = null;
+let floatingWindow = null;
 let serverProc = null;
 let apiPort = 7832;
 
@@ -126,6 +127,54 @@ async function startCoreServer() {
   return 7832;
 }
 
+function createFloatingWindow() {
+  const { screen } = require("electron");
+  const display = screen.getPrimaryDisplay();
+  const { workArea } = display;
+  const width = 340;
+  const height = 52;
+
+  floatingWindow = new BrowserWindow({
+    width,
+    height,
+    x: Math.round(workArea.x + (workArea.width - width) / 2),
+    y: Math.round(workArea.y + 10),
+    frame: false,
+    transparent: true,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: false,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "floating-preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      additionalArguments: [`--aegis-api-port=${apiPort}`],
+    },
+  });
+
+  floatingWindow.setAlwaysOnTop(true, "screen-saver");
+  floatingWindow.setVisibleOnAllWorkspaces(true, {
+    visibleOnFullScreen: true,
+  });
+
+  floatingWindow.loadFile(path.join(__dirname, "floating.html"), {
+    query: { port: String(apiPort) },
+  });
+
+  floatingWindow.once("ready-to-show", () => {
+    floatingWindow.showInactive();
+  });
+
+  floatingWindow.on("closed", () => {
+    floatingWindow = null;
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -167,12 +216,23 @@ function createWindow() {
 }
 
 ipcMain.handle("aegis:get-api-base", () => `http://127.0.0.1:${apiPort}/api/v1`);
+ipcMain.on("aegis:open-main", () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
 
 app.whenReady().then(async () => {
   apiPort = await startCoreServer();
   createWindow();
+  createFloatingWindow();
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+      createFloatingWindow();
+    }
   });
 });
 

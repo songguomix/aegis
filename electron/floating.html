@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light" />
+    <title>Aegis</title>
+    <style>
+      :root {
+        --text: #171717;
+        --muted: #737373;
+        --ok: #059669;
+        --bad: #be123c;
+        --warn: #a16207;
+        --line: rgba(255, 255, 255, 0.55);
+        --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        font-family: var(--font);
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+      }
+
+      .shell {
+        height: 100%;
+        padding: 8px;
+      }
+
+      .pill {
+        -webkit-app-region: drag;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 6px 8px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.85);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.95),
+          0 8px 28px rgba(15, 23, 42, 0.12),
+          0 1px 0 rgba(15, 23, 42, 0.04);
+        backdrop-filter: blur(24px) saturate(160%);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+      }
+
+      .brand {
+        -webkit-app-region: no-drag;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px 0 6px;
+        height: 100%;
+        color: var(--text);
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        border-right: 1px solid rgba(17, 24, 39, 0.08);
+        margin-right: 2px;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #a3a3a3;
+        box-shadow: 0 0 0 3px rgba(163, 163, 163, 0.18);
+      }
+
+      .dot.live {
+        background: var(--ok);
+        box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.18);
+      }
+
+      .stats {
+        display: flex;
+        align-items: stretch;
+        gap: 2px;
+        flex: 1;
+        -webkit-app-region: no-drag;
+      }
+
+      .stat {
+        flex: 1;
+        min-width: 72px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        padding: 2px 10px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      .stat:hover {
+        background: rgba(255, 255, 255, 0.75);
+      }
+
+      .stat:active {
+        background: rgba(255, 255, 255, 0.95);
+      }
+
+      .stat .n {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+      }
+
+      .stat.allow .n {
+        color: var(--ok);
+      }
+      .stat.block .n {
+        color: var(--bad);
+      }
+      .stat.review .n {
+        color: var(--warn);
+      }
+
+      .stat .l {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+
+      .sep {
+        width: 1px;
+        align-self: stretch;
+        margin: 4px 2px;
+        background: rgba(17, 24, 39, 0.08);
+      }
+
+      .actions {
+        -webkit-app-region: no-drag;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding-left: 4px;
+      }
+
+      .icon-btn {
+        appearance: none;
+        border: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        line-height: 1;
+      }
+
+      .icon-btn:hover {
+        background: rgba(17, 24, 39, 0.06);
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="pill">
+        <div class="brand" title="Aegis">
+          <span class="dot" id="live"></span>
+          <span>Aegis</span>
+        </div>
+        <div class="stats">
+          <div class="stat allow" id="s-allow" title="Open dashboard">
+            <span class="n" id="n-allow">0</span>
+            <span class="l">Allow</span>
+          </div>
+          <div class="sep"></div>
+          <div class="stat review" id="s-review" title="Open dashboard">
+            <span class="n" id="n-review">0</span>
+            <span class="l">Review</span>
+          </div>
+          <div class="sep"></div>
+          <div class="stat block" id="s-block" title="Open dashboard">
+            <span class="n" id="n-block">0</span>
+            <span class="l">Block</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" id="btn-open" title="Open Aegis">↗</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const port = params.get("port") || "7832";
+      const base = `http://127.0.0.1:${port}/api/v1`;
+
+      async function refresh() {
+        try {
+          const res = await fetch(`${base}/health`);
+          const d = await res.json();
+          const allow = d?.stats?.allow ?? 0;
+          const review = d?.reviews?.pending ?? d?.stats?.review ?? 0;
+          const block = d?.stats?.block ?? 0;
+          document.getElementById("n-allow").textContent = String(allow);
+          document.getElementById("n-review").textContent = String(review);
+          document.getElementById("n-block").textContent = String(block);
+          document.getElementById("live").className =
+            "dot" + (d?.ok ? " live" : "");
+        } catch {
+          document.getElementById("live").className = "dot";
+        }
+      }
+
+      function openMain() {
+        if (window.aegisFloating?.openMain) {
+          window.aegisFloating.openMain();
+        }
+      }
+
+      document.getElementById("s-allow").onclick = openMain;
+      document.getElementById("s-review").onclick = openMain;
+      document.getElementById("s-block").onclick = openMain;
+      document.getElementById("btn-open").onclick = openMain;
+
+      refresh();
+      setInterval(refresh, 2500);
+    </script>
+  </body>
+</html>

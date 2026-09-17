@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "aegis": {
+      "command": "node",
+      "args": [
+        "/Users/pinecones/Desktop/Cybersecurity For AI Agents/dist-server/index.js",
+        "--mcp"
+      ]
+    }
+  }
+}

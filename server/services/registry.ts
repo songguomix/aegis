@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { OfficialEntry } from "../types.js";
+import type { CustomBrand, OfficialEntry } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function resolveDataPath(): string {
   const candidates = [
-    path.join(__dirname, "..", "data", "official-domains.json"), // server/services → server/data
-    path.join(__dirname, "..", "..", "server", "data", "official-domains.json"), // dist-server fallback
+    path.join(__dirname, "..", "data", "official-domains.json"),
+    path.join(__dirname, "..", "..", "server", "data", "official-domains.json"),
     path.join(__dirname, "..", "..", "..", "server", "data", "official-domains.json"),
   ];
   for (const p of candidates) {
@@ -20,6 +20,20 @@ function resolveDataPath(): string {
 const DATA_PATH = resolveDataPath();
 
 let cache: Record<string, OfficialEntry> | null = null;
+let custom: Record<string, OfficialEntry> = {};
+
+export function setCustomBrands(list: CustomBrand[] | undefined): void {
+  custom = {};
+  for (const b of list ?? []) {
+    const host = normalizeHostname(b.host);
+    if (!host || !b.brand) continue;
+    custom[host] = {
+      brand: b.brand,
+      subject: b.subject || b.brand,
+      category: "custom",
+    };
+  }
+}
 
 export function loadOfficialMap(): Record<string, OfficialEntry> {
   if (cache) return cache;
@@ -29,15 +43,24 @@ export function loadOfficialMap(): Record<string, OfficialEntry> {
 }
 
 export function normalizeHostname(host: string): string {
-  return host.trim().toLowerCase().replace(/\.$/, "");
+  return host.trim().toLowerCase().replace(/^\./, "").replace(/\.$/, "");
 }
 
-/** Return official entry for hostname or a parent domain match. */
+/** Built-in registry only (for lookalike base list). */
+function builtinMap(): Record<string, OfficialEntry> {
+  return loadOfficialMap();
+}
+
+function mergedMap(): Record<string, OfficialEntry> {
+  return { ...builtinMap(), ...custom };
+}
+
+/** Official entry for hostname or a parent domain match. */
 export function lookupOfficial(hostname: string): {
   host: string;
   entry: OfficialEntry;
 } | null {
-  const map = loadOfficialMap();
+  const map = mergedMap();
   const host = normalizeHostname(hostname);
   if (map[host]) return { host, entry: map[host] };
 
@@ -50,11 +73,11 @@ export function lookupOfficial(hostname: string): {
 }
 
 export function officialHostnames(): string[] {
-  return Object.keys(loadOfficialMap()).sort();
+  return Object.keys(mergedMap()).sort();
 }
 
-export function brandKeys(): { brand: string; hosts: string[] }[] {
-  const map = loadOfficialMap();
+export function brandKeys(): { brand: string; hosts: string[]; category?: string }[] {
+  const map = mergedMap();
   const byBrand = new Map<string, string[]>();
   for (const [host, entry] of Object.entries(map)) {
     const list = byBrand.get(entry.brand) ?? [];
@@ -62,6 +85,10 @@ export function brandKeys(): { brand: string; hosts: string[] }[] {
     byBrand.set(entry.brand, list);
   }
   return [...byBrand.entries()]
-    .map(([brand, hosts]) => ({ brand, hosts: hosts.sort() }))
+    .map(([brand, hosts]) => ({
+      brand,
+      hosts: hosts.sort(),
+      category: map[hosts[0]]?.category,
+    }))
     .sort((a, b) => a.brand.localeCompare(b.brand));
 }

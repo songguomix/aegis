@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG, type EngineConfig, type GateResult } from "../types.js";
+import { setCustomBrands } from "./registry.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // dist-server/services → project root; server/services → project root
@@ -76,6 +77,7 @@ export function loadStore(): void {
   } catch {
     config = { ...DEFAULT_CONFIG };
   }
+  setCustomBrands(config.customBrands);
   try {
     if (fs.existsSync(HISTORY_PATH)) {
       history = JSON.parse(fs.readFileSync(HISTORY_PATH, "utf8")) as GateResult[];
@@ -91,6 +93,7 @@ export function getConfig(): EngineConfig {
 
 export function updateConfig(patch: Partial<EngineConfig>): EngineConfig {
   config = { ...config, ...patch };
+  if ("customBrands" in patch) setCustomBrands(config.customBrands);
   ensureDir();
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   return config;

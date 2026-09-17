@@ -8,6 +8,7 @@ import {
   type Health,
   type IntegrationInfo,
   type ReviewItem,
+  type SessionTrustEntry,
 } from "./lib/api";
 import { t, type Lang } from "./lib/i18n";
 
@@ -137,17 +138,20 @@ export default function App() {
   const [integration, setIntegration] = useState<IntegrationInfo | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [sessionTrust, setSessionTrust] = useState<SessionTrustEntry[]>([]);
+  const [customBrandsText, setCustomBrandsText] = useState("");
 
   const L = useCallback((k: Parameters<typeof t>[1]) => t(lang, k), [lang]);
 
   const refresh = useCallback(async () => {
     try {
-      const [h, hist, cfg, integ, rev] = await Promise.all([
+      const [h, hist, cfg, integ, rev, trust] = await Promise.all([
         api.health(),
         api.history(80),
         api.config(),
         api.integration(),
         api.reviews().catch(() => ({ items: [], stats: { pending: 0, allowed: 0, blocked: 0 } })),
+        api.sessionTrust().catch(() => ({ items: [] })),
       ]);
       setHealth(h);
       setHistory(hist.items);
@@ -155,6 +159,12 @@ export default function App() {
       setLang(cfg.language);
       setIntegration(integ);
       setReviews(rev.items);
+      setSessionTrust(trust.items);
+      setCustomBrandsText(
+        (cfg.customBrands ?? [])
+          .map((b) => `${b.host} | ${b.brand} | ${b.subject || ""}`)
+          .join("\n"),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -982,6 +992,19 @@ export default function App() {
                           allowlist: config.allowlist,
                           denylist: config.denylist,
                           soundEnabled: config.soundEnabled !== false,
+                          customBrands: customBrandsText
+                            .split("\n")
+                            .map((line) => line.trim())
+                            .filter(Boolean)
+                            .map((line) => {
+                              const parts = line.split("|").map((s) => s.trim());
+                              return {
+                                host: parts[0] || "",
+                                brand: parts[1] || parts[0] || "",
+                                subject: parts[2] || parts[1] || parts[0] || "",
+                              };
+                            })
+                            .filter((b) => b.host && b.brand),
                         })
                       }
                     >
@@ -1001,7 +1024,7 @@ export default function App() {
                       <label>{L("allowlist")}</label>
                       <textarea
                         className="input"
-                        rows={9}
+                        rows={5}
                         value={config.allowlist.join("\n")}
                         onChange={(e) =>
                           setConfig({
@@ -1020,7 +1043,7 @@ export default function App() {
                       <label>{L("denylist")}</label>
                       <textarea
                         className="input"
-                        rows={9}
+                        rows={5}
                         value={config.denylist.join("\n")}
                         onChange={(e) =>
                           setConfig({
@@ -1034,6 +1057,46 @@ export default function App() {
                       />
                       <div className="help">{L("denylistHelp")}</div>
                     </div>
+                  </div>
+
+                  <div className="form-row">
+                    <label>{L("customBrands")}</label>
+                    <textarea
+                      className="input"
+                      rows={4}
+                      placeholder="intranet.corp.example | Acme | Acme Internal"
+                      value={customBrandsText}
+                      onChange={(e) => setCustomBrandsText(e.target.value)}
+                    />
+                    <div className="help">{L("customBrandsHelp")}</div>
+                  </div>
+
+                  <div className="form-row">
+                    <label>{L("sessionTrust")}</label>
+                    <div className="glass-soft" style={{ overflow: "hidden" }}>
+                      {sessionTrust.length === 0 ? (
+                        <div className="empty" style={{ padding: 14 }}>
+                          —
+                        </div>
+                      ) : (
+                        sessionTrust.map((t) => (
+                          <div className="trust-row" key={t.hostname}>
+                            <code>{t.hostname}</code>
+                            <span>{t.source}</span>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={async () => {
+                                await api.untrustDomain(t.hostname);
+                                await refresh();
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="help">{L("sessionTrustHelp")}</div>
                   </div>
                 </div>
               </section>
@@ -1051,6 +1114,41 @@ export default function App() {
             </div>
 
             <div className="stack">
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>{L("agentGuard")}</h3>
+                </div>
+                <p className="help" style={{ marginTop: 0 }}>
+                  {L("agentGuardSub")}
+                </p>
+                <ul className="tool-list" style={{ marginTop: 8 }}>
+                  <li>
+                    <code>preflight</code>
+                    <span>访问任何 URL 前必须 check_url / scan_search_results</span>
+                  </li>
+                  <li>
+                    <code>allow</code>
+                    <span>可继续</span>
+                  </li>
+                  <li>
+                    <code>block</code>
+                    <span>停止，不得绕过</span>
+                  </li>
+                  <li>
+                    <code>review</code>
+                    <span>禁止访问；等人批或 resolve_review；可 trust_domain</span>
+                  </li>
+                  <li>
+                    <code>search</code>
+                    <span>列表链接用 scan_search_results，只跟进 allow</span>
+                  </li>
+                  <li>
+                    <code>files</code>
+                    <span>下载后 check_file_hash，block 则隔离</span>
+                  </li>
+                </ul>
+              </section>
+
               <section className="panel">
                 <div className="panel-head">
                   <h3>{L("mcpSection")}</h3>

@@ -23,6 +23,13 @@ import {
   resolveReview,
   reviewStats,
 } from "../services/reviewQueue.js";
+import {
+  clearTrust,
+  listTrust,
+  trustDomain,
+  untrustDomain,
+} from "../services/sessionTrust.js";
+import { AGENT_GUARD_POLICY, policyText } from "../services/agentPolicy.js";
 
 const checkSchema = z.object({
   url: z.string().min(1),
@@ -37,6 +44,15 @@ const configSchema = z.object({
   allowlist: z.array(z.string()).optional(),
   denylist: z.array(z.string()).optional(),
   soundEnabled: z.boolean().optional(),
+  customBrands: z
+    .array(
+      z.object({
+        host: z.string().min(1),
+        brand: z.string().min(1),
+        subject: z.string().optional().default(""),
+      }),
+    )
+    .optional(),
 });
 
 function resolveMcpEntry(): string {
@@ -136,41 +152,64 @@ export function createApiRouter(): express.Router {
       },
       tools: [
         {
+          name: "agent_guard_policy",
+          description: "Harness protocol text + MCP tool list. Read this first.",
+          input: [],
+        },
+        {
           name: "check_url",
           description:
-            "Verify a URL before the agent visits or downloads from it. Returns allow/review/block with authority + VirusTotal + free intel (URLhaus, ThreatFox, OpenPhish). If review, ask the human then resolve_review.",
+            "Agent Guard preflight. allow→go, block→stop, review→human then resolve_review / trust_domain.",
           input: ["url: string", "context?: string"],
         },
         {
+          name: "scan_search_results",
+          description: "Agent Guard: scan ≤20 search/chat URLs; only follow allow.",
+          input: ["urls: string[]"],
+        },
+        {
           name: "check_urls_batch",
-          description:
-            "Check up to 20 URLs (e.g. search results). Returns per-URL decisions and worst-case overall decision.",
-          input: ["urls: string[]", "context?: string"],
+          description: "Batch URL check (same engine as scan_search_results).",
+          input: ["urls: string[]"],
         },
         {
           name: "check_file_hash",
-          description:
-            "VirusTotal lookup for MD5/SHA1/SHA256 of a downloaded file. Call before opening/executing.",
-          input: ["hash: string", "fileName?: string", "context?: string"],
+          description: "VT hash lookup before open/execute a download.",
+          input: ["hash: string", "fileName?: string"],
+        },
+        {
+          name: "trust_domain",
+          description: "Session-trust hostname after human allow.",
+          input: ["hostname: string", "reason?: string"],
+        },
+        {
+          name: "session_trust",
+          description: "List session-trusted hosts.",
+          input: [],
+        },
+        {
+          name: "untrust_domain",
+          description: "Remove session trust for a host.",
+          input: ["hostname: string"],
         },
         {
           name: "get_pending_reviews",
-          description: "List URLs waiting for human/agent approval.",
+          description: "URLs waiting for approval.",
           input: [],
         },
         {
           name: "resolve_review",
-          description: "Allow or block a pending review after confirmation.",
+          description: "Allow/block a pending review after confirmation.",
           input: ["id: string", "decision: allow|block", "alwaysAllow?: boolean"],
         },
         {
           name: "verify_domain",
-          description: "Authority-only domain verification (no VirusTotal lookup).",
+          description: "Authority-only domain verification.",
           input: ["domain: string"],
         },
         {
           name: "get_gate_status",
-          description: "Engine health, policy mode, VirusTotal mode, decision counts.",
+          description: "Engine health, policy, VT mode, counts, session trust size.",
           input: [],
         },
       ],
@@ -190,6 +229,53 @@ export function createApiRouter(): express.Router {
       projectRoot: getProjectRoot(),
       mcpEntry: entry,
     });
+  });
+
+  router.get("/agent-policy", (_req, res) => {
+    res.json({
+      ...AGENT_GUARD_POLICY,
+      text: policyText(),
+      sessionTrusted: listTrust(),
+      customBrands: getConfig().customBrands ?? [],
+    });
+  });
+
+  router.get("/session-trust", (_req, res) => {
+    res.json({ items: listTrust() });
+  });
+
+  router.post("/session-trust", (req, res) => {
+    const parsed = z
+      .object({
+        hostname: z.string().min(1),
+        reason: z.string().optional(),
+        source: z.enum(["user", "agent", "resolve"]).optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const entry = trustDomain(parsed.data.hostname, {
+      reason: parsed.data.reason,
+      source: parsed.data.source ?? "user",
+    });
+    res.json(entry);
+  });
+
+  router.delete("/session-trust/:host", (req, res) => {
+    const host = String(req.params.host ?? "");
+    if (!host) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    if (host === "*") {
+      clearTrust();
+      res.json({ ok: true, cleared: true });
+      return;
+    }
+    const removed = untrustDomain(host);
+    res.json({ ok: removed, removed });
   });
 
   router.post("/check", async (req, res) => {

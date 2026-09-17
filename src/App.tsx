@@ -140,6 +140,11 @@ export default function App() {
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [sessionTrust, setSessionTrust] = useState<SessionTrustEntry[]>([]);
   const [customBrandsText, setCustomBrandsText] = useState("");
+  const [deployBundle, setDeployBundle] = useState<{
+    mcpCommand: string;
+    mcpEntry: string;
+    files: { filename: string; content: string }[];
+  } | null>(null);
 
   const L = useCallback((k: Parameters<typeof t>[1]) => t(lang, k), [lang]);
 
@@ -165,6 +170,14 @@ export default function App() {
           .map((b) => `${b.host} | ${b.brand} | ${b.subject || ""}`)
           .join("\n"),
       );
+      const bundle = await api.mcpDeployBundle().catch(() => null);
+      if (bundle) {
+        setDeployBundle({
+          mcpCommand: bundle.mcpCommand,
+          mcpEntry: bundle.mcpEntry,
+          files: bundle.files,
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -1161,6 +1174,64 @@ export default function App() {
                     <span>下载后 check_file_hash，block 则隔离</span>
                   </li>
                 </ul>
+              </section>
+
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>{L("deployBundle")}</h3>
+                </div>
+                <p className="help" style={{ marginTop: 0 }}>
+                  {L("deployBundleSub")}
+                </p>
+                <div className="code-block" style={{ marginTop: 10 }}>
+                  <div className="code-block-head">
+                    <span>MCP command</span>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() =>
+                        deployBundle && copyText("deploy-cmd", deployBundle.mcpCommand)
+                      }
+                    >
+                      {copied === "deploy-cmd" ? L("copied") : L("copy")}
+                    </button>
+                  </div>
+                  <pre className="code">
+                    {deployBundle?.mcpCommand ?? integration?.mcpCommand ?? "…"}
+                  </pre>
+                </div>
+                <div className="split" style={{ marginTop: 12, flexWrap: "wrap" }}>
+                  <button
+                    className="btn"
+                    onClick={async () => {
+                      const fromBundle = deployBundle?.files.find(
+                        (f) => f.filename === "mcp.claude.json",
+                      )?.content;
+                      const json =
+                        fromBundle ??
+                        (integration?.mcpConfig
+                          ? JSON.stringify(integration.mcpConfig, null, 2)
+                          : "");
+                      await copyText("deploy-json", json);
+                    }}
+                  >
+                    {L("copyMcpJson")}
+                  </button>
+                  <a
+                    className="btn btn-ghost"
+                    href="#"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      const url = await api.mcpDeployZipUrl();
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "aegis-mcp-deploy.zip";
+                      a.click();
+                    }}
+                  >
+                    {L("downloadZip")}
+                  </a>
+                </div>
+                <p className="help">{L("installHint")}</p>
               </section>
 
               <section className="panel">

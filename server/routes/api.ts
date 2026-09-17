@@ -31,6 +31,11 @@ import {
   isValidHostname,
 } from "../services/sessionTrust.js";
 import { AGENT_GUARD_POLICY, policyText } from "../services/agentPolicy.js";
+import {
+  buildDeployBundle,
+  buildDeployZip,
+  clientStatus,
+} from "../services/mcpDeploy.js";
 
 const checkSchema = z.object({
   url: z.string().min(1),
@@ -238,6 +243,32 @@ export function createApiRouter(): express.Router {
       text: policyText(),
       sessionTrusted: listTrust(),
       customBrands: getConfig().customBrands ?? [],
+    });
+  });
+
+  router.get("/mcp-deploy/bundle", (req, res) => {
+    const entry = req.query.entry ? String(req.query.entry) : undefined;
+    res.json(buildDeployBundle(entry));
+  });
+
+  router.get("/mcp-deploy/bundle.zip", (req, res) => {
+    const entry = req.query.entry ? String(req.query.entry) : undefined;
+    const bundle = buildDeployBundle(entry);
+    const zip = buildDeployZip(bundle);
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=${bundle.name}.zip`,
+    );
+    res.send(zip);
+  });
+
+  router.get("/mcp-deploy/status", (_req, res) => {
+    res.json({
+      entry: buildDeployBundle().mcpEntry,
+      command: buildDeployBundle().mcpCommand,
+      clients: clientStatus(),
+      note: "Export-only by design; install.sh is optional and backs up before merge.",
     });
   });
 

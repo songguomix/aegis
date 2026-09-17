@@ -951,6 +951,25 @@ export default function App() {
                     />
                   </div>
 
+                  <div className="toggle-row">
+                    <div>
+                      <div className="title">{L("enableSound")}</div>
+                      <div className="help" style={{ marginTop: 4 }}>
+                        {L("enableSoundHelp")}
+                      </div>
+                    </div>
+                    <button
+                      className={`switch ${config.soundEnabled !== false ? "on" : ""}`}
+                      aria-label="Sound"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          soundEnabled: config.soundEnabled === false,
+                        })
+                      }
+                    />
+                  </div>
+
                   <div className="form-actions">
                     <button
                       className="btn"

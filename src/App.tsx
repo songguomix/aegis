@@ -7,6 +7,7 @@ import {
   type GateResult,
   type Health,
   type IntegrationInfo,
+  type ReviewItem,
 } from "./lib/api";
 import { t, type Lang } from "./lib/i18n";
 
@@ -135,22 +136,25 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [integration, setIntegration] = useState<IntegrationInfo | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
 
   const L = useCallback((k: Parameters<typeof t>[1]) => t(lang, k), [lang]);
 
   const refresh = useCallback(async () => {
     try {
-      const [h, hist, cfg, integ] = await Promise.all([
+      const [h, hist, cfg, integ, rev] = await Promise.all([
         api.health(),
         api.history(80),
         api.config(),
         api.integration(),
+        api.reviews().catch(() => ({ items: [], stats: { pending: 0, allowed: 0, blocked: 0 } })),
       ]);
       setHealth(h);
       setHistory(hist.items);
       setConfig(cfg);
       setLang(cfg.language);
       setIntegration(integ);
+      setReviews(rev.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -252,6 +256,20 @@ export default function App() {
     if (checkMode === "file") return !hash.trim();
     if (checkMode === "batch") return !batchText.trim();
     return !url.trim();
+  }
+
+  async function resolvePending(
+    id: string,
+    decision: "allow" | "block",
+    alwaysAllow = false,
+  ) {
+    try {
+      await api.resolveReview(id, decision, { alwaysAllow, by: "user" });
+      setToast(decision === "allow" ? "Allowed" : "Blocked");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function apiBaseExport(format: "csv" | "json") {
@@ -368,6 +386,63 @@ export default function App() {
                   <div className="hint">&nbsp;</div>
                 </div>
               </div>
+
+              {reviews.length > 0 && (
+                <section className="panel pending-panel">
+                  <div className="panel-head">
+                    <h3>
+                      {L("pendingReviews")} · {reviews.length}
+                    </h3>
+                    <span className="sub">{L("pendingSub")}</span>
+                  </div>
+                  <div className="pending-list">
+                    {reviews.map((r) => (
+                      <div className="pending-item" key={r.id}>
+                        <div className="pending-main">
+                          <div className="pending-host mono">{r.hostname}</div>
+                          <div className="pending-meta">
+                            {r.summary.official
+                              ? r.summary.brand ?? "official"
+                              : "unknown"}{" "}
+                            · VT {r.summary.vtStatus} · intel {r.summary.intelStatus}
+                            {r.summary.lookalikeOf
+                              ? ` · lookalike→${r.summary.lookalikeOf}`
+                              : ""}
+                          </div>
+                          <div className="pending-reasons">
+                            {r.reasons
+                              .filter((x) => x.severity !== "info")
+                              .slice(0, 2)
+                              .map((x) => (
+                                <span key={x.code}>{x.message}</span>
+                              ))}
+                          </div>
+                        </div>
+                        <div className="pending-actions">
+                          <button
+                            className="btn"
+                            onClick={() => resolvePending(r.id, "allow", true)}
+                          >
+                            {L("approve")} · {L("alwaysAllow")}
+                          </button>
+                          <button
+                            className="btn btn-ghost"
+                            onClick={() => resolvePending(r.id, "allow", false)}
+                          >
+                            {L("approve")}
+                          </button>
+                          <button
+                            className="btn btn-ghost deny-btn"
+                            onClick={() => resolvePending(r.id, "block", true)}
+                          >
+                            {L("deny")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <div className="grid-2">
               <section className="panel">
@@ -684,6 +759,35 @@ export default function App() {
                     </div>
                   ))}
                 </div>
+
+                {result.decision === "review" && result.reviewId && (
+                  <div className="ask-box">
+                    <div className="ask-title">{L("askUser")}</div>
+                    <p className="help" style={{ margin: "4px 0 10px" }}>
+                      {L("askUserHelp")} · <code>{result.reviewId}</code>
+                    </p>
+                    <div className="pending-actions" style={{ flexDirection: "row" }}>
+                      <button
+                        className="btn"
+                        onClick={() => resolvePending(result.reviewId!, "allow", true)}
+                      >
+                        {L("approve")} · {L("alwaysAllow")}
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => resolvePending(result.reviewId!, "allow", false)}
+                      >
+                        {L("approve")}
+                      </button>
+                      <button
+                        className="btn btn-ghost deny-btn"
+                        onClick={() => resolvePending(result.reviewId!, "block", true)}
+                      >
+                        {L("deny")}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </section>
             )}
             </div>

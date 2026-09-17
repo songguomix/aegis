@@ -80,6 +80,9 @@ export interface GateResult {
   checkedAt: string;
   context?: string;
   kind?: "url" | "file" | "batch";
+  /** When decision=review, pending review id for human/agent approval */
+  reviewId?: string;
+  reviewHint?: string;
   batch?: {
     total: number;
     allow: number;

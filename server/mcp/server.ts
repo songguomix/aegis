@@ -3,8 +3,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { runGate } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
-import { getConfig, appendHistory, stats } from "../services/store.js";
+import { getConfig, appendHistory, stats, updateConfig } from "../services/store.js";
 import { lookupOfficial } from "../services/registry.js";
+import {
+  getReview,
+  listReviews,
+  resolveReview,
+  reviewStats,
+} from "../services/reviewQueue.js";
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -17,7 +23,7 @@ export function createMcpServer(): McpServer {
     {
       title: "Check URL with Aegis gate",
       description:
-        "Verify a URL before the agent visits or downloads from it. Runs domain authority checks (official registry, lookalike, RDAP) and VirusTotal. Returns allow/review/block with evidence.",
+        "Verify a URL before the agent visits or downloads from it. Returns allow/review/block with authority + VirusTotal + free intel. If decision=review, do NOT visit: ask the human operator, then call resolve_review (or wait until they approve in the Aegis app).",
       inputSchema: {
         url: z.string().describe("Full URL or hostname to check"),
         context: z.string().optional().describe("Why the agent wants this URL"),
@@ -159,9 +165,73 @@ export function createMcpServer(): McpServer {
         vtMode: cfg.vtApiKey ? "live" : "degraded",
         enableRdap: cfg.enableRdap,
         stats: stats(),
+        reviews: reviewStats(),
       };
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_pending_reviews",
+    {
+      title: "List pending URL reviews",
+      description:
+        "List URLs waiting for human/agent approval (decision=review). Ask the user about these before continuing.",
+      inputSchema: {},
+    },
+    async () => {
+      const items = listReviews(false);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ count: items.length, items }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "resolve_review",
+    {
+      title: "Resolve a pending review",
+      description:
+        "After asking the human (or yourself), set a pending review to allow or block. alwaysAllow=true also adds the host to the permanent allow/deny list.",
+      inputSchema: {
+        id: z.string().describe("Review id from check_url / get_pending_reviews"),
+        decision: z.enum(["allow", "block"]),
+        note: z.string().optional(),
+        alwaysAllow: z
+          .boolean()
+          .optional()
+          .describe("If true, persist host into allowlist or denylist"),
+      },
+    },
+    async ({ id, decision, note, alwaysAllow }) => {
+      const existing = getReview(id);
+      if (!existing) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: "not_found", id }) }],
+        };
+      }
+      const item = resolveReview(id, decision, { by: "agent", note });
+      if (alwaysAllow && existing.hostname) {
+        const cfg = getConfig();
+        const list = decision === "allow" ? cfg.allowlist : cfg.denylist;
+        if (!list.includes(existing.hostname)) {
+          updateConfig({
+            [decision === "allow" ? "allowlist" : "denylist"]: [
+              ...list,
+              existing.hostname,
+            ],
+          });
+        }
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(item, null, 2) }],
       };
     },
   );

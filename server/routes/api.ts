@@ -17,6 +17,12 @@ import {
 import { brandKeys, lookupOfficial } from "../services/registry.js";
 import { vtCacheSize } from "../services/virustotal.js";
 import { intelFeedStatus } from "../services/threatIntel.js";
+import {
+  getReview,
+  listReviews,
+  resolveReview,
+  reviewStats,
+} from "../services/reviewQueue.js";
 
 const checkSchema = z.object({
   url: z.string().min(1),
@@ -51,10 +57,62 @@ export function createApiRouter(): express.Router {
       service: "aegis",
       version: "0.1.0",
       stats: stats(),
+      reviews: reviewStats(),
       vtCache: vtCacheSize(),
       intelFeeds: intelFeedStatus(),
       policyMode: getConfig().policyMode,
     });
+  });
+
+  router.get("/reviews", (req, res) => {
+    const includeResolved = String(req.query.all ?? "") === "1";
+    res.json({ items: listReviews(includeResolved), stats: reviewStats() });
+  });
+
+  router.get("/reviews/:id", (req, res) => {
+    const it = getReview(req.params.id);
+    if (!it) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+    res.json(it);
+  });
+
+  router.post("/reviews/:id/resolve", (req, res) => {
+    const parsed = z
+      .object({
+        decision: z.enum(["allow", "block"]),
+        note: z.string().optional(),
+        by: z.enum(["user", "agent"]).optional(),
+        alwaysAllow: z.boolean().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const existing = getReview(req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+    const item = resolveReview(req.params.id, parsed.data.decision, {
+      by: parsed.data.by ?? "user",
+      note: parsed.data.note,
+    });
+    if (parsed.data.decision === "allow" && parsed.data.alwaysAllow) {
+      const cfg = getConfig();
+      if (!cfg.allowlist.includes(existing.hostname)) {
+        updateConfig({ allowlist: [...cfg.allowlist, existing.hostname] });
+      }
+    }
+    if (parsed.data.decision === "block" && parsed.data.alwaysAllow) {
+      const cfg = getConfig();
+      if (!cfg.denylist.includes(existing.hostname)) {
+        updateConfig({ denylist: [...cfg.denylist, existing.hostname] });
+      }
+    }
+    res.json(item);
   });
 
   router.get("/integration", (_req, res) => {
@@ -77,7 +135,7 @@ export function createApiRouter(): express.Router {
         {
           name: "check_url",
           description:
-            "Verify a URL before the agent visits or downloads from it. Returns allow/review/block with authority + VirusTotal + free intel (URLhaus, ThreatFox, OpenPhish).",
+            "Verify a URL before the agent visits or downloads from it. Returns allow/review/block with authority + VirusTotal + free intel (URLhaus, ThreatFox, OpenPhish). If review, ask the human then resolve_review.",
           input: ["url: string", "context?: string"],
         },
         {
@@ -91,6 +149,16 @@ export function createApiRouter(): express.Router {
           description:
             "VirusTotal lookup for MD5/SHA1/SHA256 of a downloaded file. Call before opening/executing.",
           input: ["hash: string", "fileName?: string", "context?: string"],
+        },
+        {
+          name: "get_pending_reviews",
+          description: "List URLs waiting for human/agent approval.",
+          input: [],
+        },
+        {
+          name: "resolve_review",
+          description: "Allow or block a pending review after confirmation.",
+          input: ["id: string", "decision: allow|block", "alwaysAllow?: boolean"],
         },
         {
           name: "verify_domain",

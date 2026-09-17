@@ -54,6 +54,8 @@ export interface GateResult {
   checkedAt: string;
   context?: string;
   kind?: "url" | "file" | "batch";
+  reviewId?: string;
+  reviewHint?: string;
 }
 
 export interface FileGateResult {
@@ -122,6 +124,28 @@ export interface EngineConfigView {
   httpPort: number;
 }
 
+export interface ReviewItem {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  status: "pending" | "allowed" | "blocked" | "expired";
+  url: string;
+  hostname: string;
+  score: number;
+  context?: string;
+  summary: {
+    official: boolean;
+    brand: string | null;
+    lookalikeOf: string | null;
+    vtStatus: string;
+    intelStatus: string;
+  };
+  reasons: Reason[];
+  resolvedAt?: string;
+  resolvedBy?: string;
+  note?: string;
+}
+
 export interface Health {
   ok: boolean;
   service: string;
@@ -133,6 +157,7 @@ export interface Health {
     block: number;
     vtMode: "live" | "degraded";
   };
+  reviews?: { pending: number; allowed: number; blocked: number };
   vtCache: number;
   policyMode: string;
 }
@@ -191,5 +216,15 @@ export const api = {
     request<BatchResult>("/check-batch", {
       method: "POST",
       body: JSON.stringify({ urls, context }),
+    }),
+  reviews: () => request<{ items: ReviewItem[]; stats: { pending: number; allowed: number; blocked: number } }>("/reviews"),
+  resolveReview: (
+    id: string,
+    decision: "allow" | "block",
+    opts?: { alwaysAllow?: boolean; note?: string; by?: "user" | "agent" },
+  ) =>
+    request<ReviewItem>(`/reviews/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ decision, ...opts, by: opts?.by ?? "user" }),
     }),
 };

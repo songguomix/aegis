@@ -198,7 +198,7 @@ export async function runGate(
   const decision = decide(authority, vt.status, config, reasons, intel.status);
   const score = scoreOf(decision, authority, vt.status, reasons, intel.status);
 
-  return {
+  const result: GateResult = {
     id: `chk_${randomUUID().slice(0, 8)}`,
     url: parsed.url.toString(),
     hostname,
@@ -211,6 +211,21 @@ export async function runGate(
     checkedAt: new Date().toISOString(),
     context,
   };
+
+  if (decision === "review") {
+    const { enqueueReview } = await import("./reviewQueue.js");
+    const item = enqueueReview(result);
+    result.reviewId = item.id;
+    result.reviewHint =
+      "Unknown or uncertain site. Ask the human operator, or call resolve_review with allow/block after confirmation. Do not visit until resolved.";
+    reasons.push({
+      code: "review_required",
+      severity: "warn",
+      message: `Queued for review ${item.id}. Waiting for human/agent approval before continuing.`,
+    });
+  }
+
+  return result;
 }
 
 function decide(

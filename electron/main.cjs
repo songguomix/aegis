@@ -225,12 +225,36 @@ ipcMain.on("aegis:open-main", () => {
 });
 ipcMain.on("aegis:float-size", (_e, compact) => {
   if (!floatingWindow || floatingWindow.isDestroyed()) return;
-  const width = compact ? 232 : 420;
+  const targetWidth = compact ? 232 : 420;
   const height = 56;
   const [x, y] = floatingWindow.getPosition();
   const [w] = floatingWindow.getSize();
-  const nx = Math.round(x + (w - width) / 2);
-  floatingWindow.setBounds({ x: nx, y, width, height });
+  const from = w;
+  const to = targetWidth;
+  if (Math.abs(to - from) < 2) {
+    floatingWindow.setBounds({
+      x: Math.round(x + (w - to) / 2),
+      y,
+      width: to,
+      height,
+    });
+    return;
+  }
+  const start = Date.now();
+  const duration = 380;
+  const tick = () => {
+    if (!floatingWindow || floatingWindow.isDestroyed()) return;
+    const t = Math.min(1, (Date.now() - start) / duration);
+    // ease-out cubic
+    const e = 1 - Math.pow(1 - t, 3);
+    const width = Math.round(from + (to - from) * e);
+    const [cx] = floatingWindow.getPosition();
+    const [cw] = floatingWindow.getSize();
+    const nx = Math.round(cx + (cw - width) / 2);
+    floatingWindow.setBounds({ x: nx, y, width, height });
+    if (t < 1) setImmediate(tick);
+  };
+  tick();
 });
 
 app.whenReady().then(async () => {

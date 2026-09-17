@@ -12,6 +12,8 @@
         --ok: #059669;
         --bad: #be123c;
         --warn: #a16207;
+        --spring: cubic-bezier(0.22, 1.15, 0.36, 1);
+        --soft: cubic-bezier(0.4, 0, 0.2, 1);
         --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
           "PingFang SC", sans-serif;
       }
@@ -58,18 +60,25 @@
           0 10px 32px rgba(15, 23, 42, 0.14);
         backdrop-filter: blur(28px) saturate(170%);
         -webkit-backdrop-filter: blur(28px) saturate(170%);
+        transition:
+          box-shadow 0.45s var(--soft),
+          transform 0.45s var(--spring);
+        will-change: box-shadow;
       }
-
       .bar.has-domain {
         justify-content: flex-start;
+      }
+      .bar.lift {
+        transform: scale(1.015);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.98),
+          0 14px 40px rgba(15, 23, 42, 0.18);
       }
 
       body.preview .bar {
         width: min(460px, 94vw);
         height: 56px;
-        box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.95),
-          0 16px 40px rgba(15, 23, 42, 0.16);
+        transition: width 0.45s var(--spring), box-shadow 0.45s var(--soft);
       }
       body.preview .bar:not(.has-domain) {
         width: min(240px, 88vw);
@@ -77,6 +86,7 @@
       }
 
       .light {
+        position: relative;
         flex-shrink: 0;
         width: 11px;
         height: 11px;
@@ -84,9 +94,17 @@
         background: #a3a3a3;
         box-shadow: 0 0 0 3px rgba(163, 163, 163, 0.16);
         transition:
-          background 0.2s ease,
-          box-shadow 0.2s ease,
-          transform 0.2s ease;
+          background 0.35s var(--soft),
+          box-shadow 0.45s var(--soft),
+          transform 0.4s var(--spring);
+      }
+      .light::after {
+        content: "";
+        position: absolute;
+        inset: -3px;
+        border-radius: 50%;
+        border: 1.5px solid transparent;
+        opacity: 0;
       }
       .light.allow {
         background: var(--ok);
@@ -100,18 +118,43 @@
         background: var(--bad);
         box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.18);
       }
-      .light.pulse {
-        animation: pulse 0.55s ease;
+      .light.allow::after {
+        border-color: rgba(5, 150, 105, 0.45);
       }
-      @keyframes pulse {
+      .light.review::after {
+        border-color: rgba(217, 119, 6, 0.45);
+      }
+      .light.block::after {
+        border-color: rgba(190, 18, 60, 0.45);
+      }
+      .light.pulse {
+        animation: lightPulse 0.75s var(--spring);
+      }
+      .light.pulse::after {
+        animation: ringOut 0.75s var(--soft);
+      }
+      @keyframes lightPulse {
         0% {
-          transform: scale(0.85);
+          transform: scale(0.75);
         }
-        55% {
-          transform: scale(1.22);
+        40% {
+          transform: scale(1.28);
+        }
+        70% {
+          transform: scale(0.94);
         }
         100% {
           transform: scale(1);
+        }
+      }
+      @keyframes ringOut {
+        0% {
+          opacity: 0.9;
+          transform: scale(0.7);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(2.1);
         }
       }
 
@@ -125,16 +168,38 @@
         border-radius: 12px;
         background: rgba(17, 24, 39, 0.04);
         cursor: pointer;
+        transition: background 0.25s var(--soft);
+      }
+      .counts:hover {
+        background: rgba(17, 24, 39, 0.06);
       }
       .count {
         min-width: 40px;
         padding: 3px 7px;
         border-radius: 9px;
         text-align: center;
-        transition: background 0.15s ease;
+        transition:
+          background 0.2s var(--soft),
+          transform 0.35s var(--spring);
       }
       .count:hover {
-        background: rgba(255, 255, 255, 0.85);
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .count.bump .n {
+        animation: numBump 0.45s var(--spring);
+      }
+      @keyframes numBump {
+        0% {
+          transform: translateY(2px) scale(0.92);
+          opacity: 0.7;
+        }
+        55% {
+          transform: translateY(-1px) scale(1.06);
+        }
+        100% {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+        }
       }
       .count .n {
         display: block;
@@ -164,11 +229,6 @@
         color: var(--bad);
       }
 
-      /*
-        Domain strip: NOT a permanent right column.
-        flex:0 → no empty space when idle.
-        When .has-domain → flex:1 and fills ALL remaining width.
-      */
       .domain {
         -webkit-app-region: no-drag;
         flex: 0 0 0%;
@@ -177,27 +237,34 @@
         opacity: 0;
         overflow: hidden;
         border-radius: 12px;
-        background: rgba(17, 24, 39, 0.045);
+        background: linear-gradient(
+          90deg,
+          rgba(17, 24, 39, 0.05),
+          rgba(17, 24, 39, 0.03)
+        );
         height: 36px;
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 0;
         cursor: pointer;
+        transform: translateX(16px) scaleX(0.92);
+        transform-origin: left center;
         transition:
-          flex 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-          max-width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-          opacity 0.28s ease,
-          padding 0.28s ease,
-          transform 0.28s ease;
-        transform: translateX(12px);
+          flex 0.42s var(--spring),
+          max-width 0.42s var(--spring),
+          opacity 0.28s var(--soft) 0.05s,
+          padding 0.32s var(--soft),
+          transform 0.42s var(--spring),
+          background 0.35s var(--soft);
+        will-change: flex, max-width, opacity, transform;
       }
       .bar.has-domain .domain {
         flex: 1 1 auto;
         max-width: none;
         opacity: 1;
         padding: 0 12px;
-        transform: translateX(0);
+        transform: translateX(0) scaleX(1);
       }
 
       .domain .tag {
@@ -209,6 +276,15 @@
         padding: 2px 6px;
         border-radius: 5px;
         line-height: 1.2;
+        opacity: 0;
+        transform: translateY(4px);
+        transition:
+          opacity 0.3s var(--soft) 0.12s,
+          transform 0.35s var(--spring) 0.1s;
+      }
+      .bar.has-domain .domain .tag {
+        opacity: 1;
+        transform: translateY(0);
       }
       .tag.allow {
         color: var(--ok);
@@ -222,10 +298,6 @@
         color: var(--bad);
         background: rgba(190, 18, 60, 0.12);
       }
-      .tag.ok {
-        color: var(--muted);
-        background: rgba(17, 24, 39, 0.06);
-      }
 
       .domain .host {
         min-width: 0;
@@ -238,6 +310,15 @@
         font-weight: 600;
         color: var(--text);
         text-align: left;
+        opacity: 0;
+        transform: translateY(5px);
+        transition:
+          opacity 0.32s var(--soft) 0.16s,
+          transform 0.38s var(--spring) 0.14s;
+      }
+      .bar.has-domain .domain .host {
+        opacity: 1;
+        transform: translateY(0);
       }
 
       .open {
@@ -254,65 +335,90 @@
         cursor: pointer;
         display: grid;
         place-items: center;
-        transition:
-          background 0.15s ease,
-          transform 0.15s ease;
         padding: 0;
+        transition:
+          background 0.2s var(--soft),
+          transform 0.35s var(--spring),
+          box-shadow 0.25s var(--soft);
       }
-
       .bar:not(.has-domain) .open {
         margin-left: 0;
       }
       .open:hover {
         background: #fff;
-        transform: translateY(-1px);
+        transform: translateY(-1px) scale(1.04);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+      }
+      .open:hover svg {
+        transform: translate(1px, -1px);
+      }
+      .open:active {
+        transform: translateY(0) scale(0.96);
       }
       .open svg {
         display: block;
+        transition: transform 0.25s var(--spring);
       }
 
-      .bar.flash-allow {
-        animation: flashOk 0.45s ease;
+      .bar.flash-allow,
+      .bar.flash-review,
+      .bar.flash-block {
+        animation: borderGlow 0.7s var(--soft);
+      }
+      @keyframes borderGlow {
+        0% {
+          box-shadow:
+            inset 0 0 0 2px rgba(5, 150, 105, 0),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        25% {
+          box-shadow:
+            inset 0 0 0 2px rgba(5, 150, 105, 0.4),
+            0 14px 36px rgba(15, 23, 42, 0.16);
+        }
+        100% {
+          box-shadow:
+            inset 0 0 0 2px rgba(5, 150, 105, 0),
+            0 10px 32px rgba(15, 23, 42, 0.14);
+        }
       }
       .bar.flash-review {
-        animation: flashWarn 0.45s ease;
+        animation-name: borderGlowWarn;
       }
       .bar.flash-block {
-        animation: flashBad 0.45s ease;
+        animation-name: borderGlowBad;
       }
-      @keyframes flashOk {
+      @keyframes borderGlowWarn {
         0% {
           box-shadow:
-            inset 0 0 0 2px rgba(5, 150, 105, 0.45),
+            inset 0 0 0 2px rgba(217, 119, 6, 0),
             0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        25% {
+          box-shadow:
+            inset 0 0 0 2px rgba(217, 119, 6, 0.42),
+            0 14px 36px rgba(15, 23, 42, 0.16);
         }
         100% {
           box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            inset 0 0 0 2px rgba(217, 119, 6, 0),
             0 10px 32px rgba(15, 23, 42, 0.14);
         }
       }
-      @keyframes flashWarn {
+      @keyframes borderGlowBad {
         0% {
           box-shadow:
-            inset 0 0 0 2px rgba(217, 119, 6, 0.45),
+            inset 0 0 0 2px rgba(190, 18, 60, 0),
             0 10px 32px rgba(15, 23, 42, 0.14);
+        }
+        25% {
+          box-shadow:
+            inset 0 0 0 2px rgba(190, 18, 60, 0.42),
+            0 14px 36px rgba(15, 23, 42, 0.16);
         }
         100% {
           box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.95),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
-      }
-      @keyframes flashBad {
-        0% {
-          box-shadow:
-            inset 0 0 0 2px rgba(190, 18, 60, 0.45),
-            0 10px 32px rgba(15, 23, 42, 0.14);
-        }
-        100% {
-          box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.95),
+            inset 0 0 0 2px rgba(190, 18, 60, 0),
             0 10px 32px rgba(15, 23, 42, 0.14);
         }
       }
@@ -322,15 +428,15 @@
     <div class="bar" id="bar">
       <div class="light" id="light" title="Latest decision"></div>
       <div class="counts" id="counts">
-        <div class="count allow" title="Allowed">
+        <div class="count allow" data-k="allow" title="Allowed">
           <span class="n" id="n-allow">0</span>
           <span class="l">OK</span>
         </div>
-        <div class="count review" title="Pending">
+        <div class="count review" data-k="review" title="Pending">
           <span class="n" id="n-review">0</span>
           <span class="l">?</span>
         </div>
-        <div class="count block" title="Blocked">
+        <div class="count block" data-k="block" title="Blocked">
           <span class="n" id="n-block">0</span>
           <span class="l">NO</span>
         </div>
@@ -372,8 +478,20 @@
         let hideTimer = null;
         let queue = [];
         let live = false;
+        const lastCounts = { allow: null, review: null, block: null };
+
+        function setCompact(compact) {
+          try {
+            if (window.aegisFloating && window.aegisFloating.setCompact) {
+              window.aegisFloating.setCompact(compact);
+            }
+          } catch {
+            /* preview */
+          }
+        }
 
         function setLight(decision) {
+          light.classList.remove("pulse");
           light.className = "light " + (decision || "");
           void light.offsetWidth;
           light.classList.add("pulse");
@@ -381,21 +499,25 @@
 
         function flash(decision) {
           const cls = "flash-" + decision;
-          bar.classList.remove("flash-allow", "flash-review", "flash-block");
+          bar.classList.remove("flash-allow", "flash-review", "flash-block", "lift");
           void bar.offsetWidth;
-          bar.classList.add(cls);
-          setTimeout(() => bar.classList.remove(cls), 480);
+          bar.classList.add(cls, "lift");
+          setTimeout(() => {
+            bar.classList.remove(cls, "lift");
+          }, 700);
         }
 
-        /** Expand domain to fill ALL remaining bar width. */
-        function setCompact(compact) {
-          try {
-            if (window.aegisFloating && window.aegisFloating.setCompact) {
-              window.aegisFloating.setCompact(compact);
-            }
-          } catch {
-            /* preview / non-electron */
-          }
+        function bumpCount(key, value) {
+          const el = document.querySelector('.count[data-k="' + key + '"] .n');
+          const wrap = document.querySelector('.count[data-k="' + key + '"]');
+          if (!el) return;
+          const changed = lastCounts[key] !== value;
+          lastCounts[key] = value;
+          el.textContent = String(value);
+          if (!changed) return;
+          wrap.classList.remove("bump");
+          void wrap.offsetWidth;
+          wrap.classList.add("bump");
         }
 
         function showDomain(decision, hostname) {
@@ -406,8 +528,11 @@
           host.textContent = hostname || "";
           bar.classList.remove("has-domain");
           void domainEl.offsetWidth;
-          bar.classList.add("has-domain");
-          setCompact(false);
+          // expand: spring width + delayed text fade-in (CSS)
+          requestAnimationFrame(() => {
+            bar.classList.add("has-domain");
+            setCompact(false);
+          });
           flash(decision);
           clearTimeout(hideTimer);
           hideTimer = setTimeout(() => {
@@ -416,7 +541,7 @@
             setCompact(true);
             const next = queue.shift();
             if (next) {
-              setTimeout(() => showDomain(next.decision, next.hostname), 220);
+              setTimeout(() => showDomain(next.decision, next.hostname), 280);
             }
           }, LIVE_MS);
         }
@@ -426,7 +551,6 @@
             queue = queue.filter((q) => q.hostname !== hostname);
             queue.unshift({ decision, hostname });
             if (queue.length > 4) queue.length = 4;
-            // update light immediately, domain replaces when current ends
             setLight(decision);
             return;
           }
@@ -441,15 +565,12 @@
             ]);
             const health = await healthRes.json();
             const hist = await histRes.json();
-            document.getElementById("n-allow").textContent = String(
-              health?.stats?.allow ?? 0,
-            );
-            document.getElementById("n-review").textContent = String(
+            bumpCount("allow", health?.stats?.allow ?? 0);
+            bumpCount(
+              "review",
               health?.reviews?.pending ?? health?.stats?.review ?? 0,
             );
-            document.getElementById("n-block").textContent = String(
-              health?.stats?.block ?? 0,
-            );
+            bumpCount("block", health?.stats?.block ?? 0);
 
             const items = hist?.items ?? [];
             const newest = items[0];
@@ -492,7 +613,7 @@
             const d = demo[i % demo.length];
             i++;
             pushDomain(d[0], d[1]);
-          }, 3500);
+          }, 3800);
         }
       })();
     </script>

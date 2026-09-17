@@ -14,8 +14,17 @@ function isAllowedOrigin(origin: string): boolean {
   return LOCAL_ORIGIN.test(origin);
 }
 
-function isMutating(method: string): boolean {
-  return method === "PUT" || method === "DELETE" || method === "PATCH";
+function isMutating(method: string, pathName = ""): boolean {
+  if (method === "PUT" || method === "DELETE" || method === "PATCH") return true;
+  // Security-control POSTs require local token when Origin is absent
+  if (method === "POST") {
+    return (
+      pathName.includes("/session-trust") ||
+      pathName.includes("/reviews/") ||
+      pathName.endsWith("/resolve")
+    );
+  }
+  return false;
 }
 
 export function createApp(): express.Express {
@@ -47,7 +56,7 @@ export function createApp(): express.Express {
     // Defense-in-depth for mutating routes: foreign browser origins are rejected
     // even if a client bypasses preflight. Allowed local console origins may
     // mutate; non-browser clients must present the local token.
-    if (isMutating(req.method)) {
+    if (isMutating(req.method, req.path || req.url || "")) {
       if (origin && !isAllowedOrigin(origin)) {
         res.status(403).json({ error: "forbidden_origin" });
         return;

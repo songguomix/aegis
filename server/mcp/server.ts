@@ -11,6 +11,15 @@ import {
   resolveReview,
   reviewStats,
 } from "../services/reviewQueue.js";
+import {
+  clearTrust,
+  isTrusted,
+  listTrust,
+  trustDomain,
+  untrustDomain,
+  isValidHostname,
+} from "../services/sessionTrust.js";
+import { AGENT_GUARD_POLICY, policyText } from "../services/agentPolicy.js";
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -48,7 +57,7 @@ export function createMcpServer(): McpServer {
     {
       title: "Batch check URLs",
       description:
-        "Check up to 20 URLs at once (e.g. search results). Returns per-URL decisions and an overall worst-case decision. Use before an agent follows many links from search.",
+        "Check up to 20 URLs at once (e.g. search results). Returns per-URL decisions and an overall worst-case decision. Prefer scan_search_results as the Agent Guard name for SERP flows.",
       inputSchema: {
         urls: z.array(z.string()).min(1).max(20).describe("URLs to check"),
         context: z.string().optional(),
@@ -70,6 +79,132 @@ export function createMcpServer(): McpServer {
           {
             type: "text",
             text: JSON.stringify({ decision, total: results.length, allow, review, block, results }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "scan_search_results",
+    {
+      title: "Scan search results (Agent Guard)",
+      description:
+        "Agent Guard: paste up to 20 URLs from search/chat. Only follow hosts with decision=allow or session trust. review → ask human; block → never open.",
+      inputSchema: {
+        urls: z.array(z.string()).min(1).max(20),
+        context: z.string().optional(),
+      },
+    },
+    async ({ urls, context }) => {
+      const results = [];
+      for (const url of urls) {
+        const r = await runGate(url, getConfig(), context ?? "scan_search_results");
+        results.push(r);
+        appendHistory(r);
+      }
+      const allow = results.filter((r) => r.decision === "allow").length;
+      const review = results.filter((r) => r.decision === "review").length;
+      const block = results.filter((r) => r.decision === "block").length;
+      const decision = block > 0 ? "block" : review > 0 ? "review" : "allow";
+      const followable = results
+        .filter((r) => r.decision === "allow")
+        .map((r) => r.hostname);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              { decision, total: results.length, allow, review, block, followable, results },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "trust_domain",
+    {
+      title: "Session-trust a domain",
+      description:
+        "Agent Guard: after human allows a review, mark hostname session-trusted so later checks in this app session return allow (still blocked on malware/denylist). Not a permanent allowlist.",
+      inputSchema: {
+        hostname: z.string(),
+        reason: z.string().optional(),
+      },
+    },
+    async ({ hostname, reason }) => {
+      if (!isValidHostname(hostname)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: "invalid_hostname",
+                hostname,
+                hint: "Use a bare hostname like partner.example — no scheme or path.",
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+      const entry = trustDomain(hostname, { reason, source: "agent" });
+      return { content: [{ type: "text", text: JSON.stringify(entry, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    "session_trust",
+    {
+      title: "List session-trusted domains",
+      description: "Hostname allow-for-this-session list (from user UI or trust_domain).",
+      inputSchema: {},
+    },
+    async () => {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ items: listTrust() }, null, 2) },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "untrust_domain",
+    {
+      title: "Remove session trust",
+      description: "Remove a hostname from session trust.",
+      inputSchema: { hostname: z.string() },
+    },
+    async ({ hostname }) => {
+      const ok = untrustDomain(hostname);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ hostname, removed: ok }) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "agent_guard_policy",
+    {
+      title: "Aegis Agent Guard policy",
+      description: "Machine-readable + text protocol the agent harness must follow.",
+      inputSchema: {},
+    },
+    async () => {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              { ...AGENT_GUARD_POLICY, text: policyText(), sessionTrusted: listTrust() },
+              null,
+              2,
+            ),
           },
         ],
       };
@@ -199,7 +334,7 @@ export function createMcpServer(): McpServer {
     {
       title: "Resolve a pending review",
       description:
-        "After asking the human (or yourself), set a pending review to allow or block. alwaysAllow=true also adds the host to the permanent allow/deny list.",
+        "After explicit human confirmation, set a pending review to allow or block. Do not call this autonomously. alwaysAllow=true also writes the host to permanent allow/deny list.",
       inputSchema: {
         id: z.string().describe("Review id from check_url / get_pending_reviews"),
         decision: z.enum(["allow", "block"]),

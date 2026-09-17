@@ -123,6 +123,30 @@ export interface EngineConfigView {
   rdapTimeoutMs: number;
   httpPort: number;
   soundEnabled?: boolean;
+  customBrands?: CustomBrand[];
+}
+
+export interface SessionTrustEntry {
+  hostname: string;
+  addedAt: string;
+  reason?: string;
+  source: string;
+}
+
+export interface CustomBrand {
+  host: string;
+  brand: string;
+  subject: string;
+}
+
+export interface AgentPolicy {
+  name: string;
+  version: string;
+  rules: { id: string; text: string }[];
+  mcpTools: string[];
+  text: string;
+  sessionTrusted?: SessionTrustEntry[];
+  customBrands?: CustomBrand[];
 }
 
 export interface ReviewItem {
@@ -227,5 +251,21 @@ export const api = {
     request<ReviewItem>(`/reviews/${id}/resolve`, {
       method: "POST",
       body: JSON.stringify({ decision, ...opts, by: opts?.by ?? "user" }),
+    }),
+  agentPolicy: () => request<AgentPolicy>("/agent-policy"),
+  sessionTrust: () => request<{ items: SessionTrustEntry[] }>("/session-trust"),
+  trustDomain: (hostname: string, reason?: string) =>
+    request<SessionTrustEntry>("/session-trust", {
+      method: "POST",
+      body: JSON.stringify({ hostname, reason, source: "user" }),
+    }),
+  untrustDomain: (hostname: string) =>
+    request<{ ok: boolean }>(
+      `/session-trust/${encodeURIComponent(hostname)}`,
+      { method: "DELETE" },
+    ),
+  clearSessionTrust: () =>
+    request<{ ok: boolean; cleared: boolean }>("/session-trust/%2A", {
+      method: "DELETE",
     }),
 };

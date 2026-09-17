@@ -9,6 +9,7 @@ import { buildAuthority } from "./authority.js";
 import { lookupDomainVt } from "./virustotal.js";
 import { lookupThreatIntel } from "./threatIntel.js";
 import { normalizeHostname } from "./registry.js";
+import { isTrusted } from "./sessionTrust.js";
 
 export function parseUrl(input: string): { ok: true; url: URL; hostname: string } | { ok: false; error: string } {
   const trimmed = input.trim();
@@ -98,6 +99,15 @@ export async function runGate(
 
   const { hostname } = parsed;
   const { report: authority, reasons } = await buildAuthority(hostname, config);
+  const sessionTrusted = isTrusted(hostname);
+  authority.sessionTrusted = sessionTrusted;
+  if (sessionTrusted) {
+    reasons.push({
+      code: "session_trust",
+      severity: "info",
+      message: `Session-trusted host (${hostname}). Human/agent already allowed this host in Aegis.`,
+    });
+  }
   const vt = options.skipVt
     ? {
         status: "degraded" as const,
@@ -217,7 +227,7 @@ export async function runGate(
     const item = enqueueReview(result);
     result.reviewId = item.id;
     result.reviewHint =
-      "Unknown or uncertain site. Ask the human operator, or call resolve_review with allow/block after confirmation. Do not visit until resolved.";
+      "Agent Guard: decision=review — do NOT visit. Ask the human, then resolve_review. After allow you may call trust_domain(hostname) for this session.";
     reasons.push({
       code: "review_required",
       severity: "warn",
@@ -233,19 +243,19 @@ function decide(
   vtStatus: GateResult["virusTotal"]["status"],
   config: EngineConfig,
   reasons: Reason[],
-  intelStatus?: GateResult["threatIntel"] extends infer T
-    ? T extends { status: infer S }
-      ? S
-      : never
-    : never,
+  intelStatus?: string,
 ): Decision {
   const intelListed = intelStatus === "listed";
-  // Observe mode: never hard-block except denylist/invalid already handled
+  const sessionTrusted = Boolean(authority.sessionTrusted);
   const hardBlockSignals =
     authority.denylisted ||
     vtStatus === "malicious" ||
     intelListed ||
-    (authority.lookalikeOf !== null && !authority.allowlisted && authority.official === false && reasons.some((r) => r.code === "lookalike_domain" && r.severity === "critical"));
+    (authority.lookalikeOf !== null &&
+      !authority.allowlisted &&
+      !sessionTrusted &&
+      authority.official === false &&
+      reasons.some((r) => r.code === "lookalike_domain" && r.severity === "critical"));
 
   if (config.policyMode === "observe") {
     if (authority.denylisted || vtStatus === "malicious" || intelListed) return "block";
@@ -254,6 +264,15 @@ function decide(
   }
 
   if (hardBlockSignals) return "block";
+
+  // Session trust: already human-approved this session — allow unless hard danger
+  if (sessionTrusted && !authority.denylisted) {
+    if (vtStatus === "clean" || vtStatus === "degraded" || vtStatus === "unknown") {
+      return "allow";
+    }
+    if (vtStatus === "suspicious") return "review";
+    return "allow";
+  }
 
   if (config.policyMode === "strict") {
     if (authority.allowlisted && (vtStatus === "clean" || vtStatus === "degraded")) return "allow";
@@ -267,8 +286,10 @@ function decide(
   if (authority.allowlisted && vt !== "malicious" && vt !== "suspicious" && !intelListed) {
     return "allow";
   }
-  if (authority.official && (vtStatus === "clean" || vtStatus === "degraded" || vtStatus === "unknown")) {
-    // official + clean (or no VT data but known brand) → allow
+  if (
+    authority.official &&
+    (vtStatus === "clean" || vtStatus === "degraded" || vtStatus === "unknown")
+  ) {
     if (intelListed) return "block";
     if (vtStatus === "clean" || vtStatus === "degraded") return "allow";
     return "review";
@@ -277,7 +298,6 @@ function decide(
   if (authority.lookalikeOf) return "block";
   if (authority.punycode || authority.mixedScript) return "review";
 
-  // Unknown domain, no hard signal → review
   return "review";
 }
 
@@ -291,6 +311,7 @@ function scoreOf(
   let score = 50;
   if (authority.official) score += 30;
   if (authority.allowlisted) score += 25;
+  if (authority.sessionTrusted) score += 20;
   if (authority.denylisted) score -= 50;
   if (authority.lookalikeOf) score -= 35;
   if (authority.punycode) score -= 15;

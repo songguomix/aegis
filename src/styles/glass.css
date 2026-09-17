@@ -796,6 +796,23 @@ textarea.input::selection {
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
 }
 
+.trust-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.trust-row:last-child {
+  border-bottom: none;
+}
+.trust-row code {
+  font-family: var(--mono);
+  word-break: break-all;
+}
+
 @media (max-width: 720px) {
   .tool-list li,
   .tool-list.endpoints li {

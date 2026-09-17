@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 import type { GateResult } from "../types.js";
 
 export type ReviewStatus = "pending" | "allowed" | "blocked" | "expired";
@@ -27,12 +28,14 @@ export interface ReviewItem {
   note?: string;
 }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, "..", "..");
 const TTL_MS = 30 * 60 * 1000;
 const MAX_ITEMS = 200;
 
 const DATA_DIR = process.env.AEGIS_DATA_DIR
   ? path.resolve(process.env.AEGIS_DATA_DIR)
-  : path.join(process.cwd(), ".aegis");
+  : path.join(ROOT, ".aegis");
 const FILE = path.join(DATA_DIR, "reviews.json");
 
 const items = new Map<string, ReviewItem>();

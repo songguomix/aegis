@@ -39,6 +39,7 @@ export interface AuthorityReport {
   mixedScript: boolean;
   allowlisted: boolean;
   denylisted: boolean;
+  sessionTrusted?: boolean;
 }
 
 export interface VirusTotalReport {
@@ -105,6 +106,19 @@ export interface FileGateResult {
   kind: "file";
 }
 
+export interface CustomBrand {
+  host: string;
+  brand: string;
+  subject: string;
+}
+
+export interface SessionTrustEntry {
+  hostname: string;
+  addedAt: string;
+  reason?: string;
+  source: "user" | "agent" | "resolve";
+}
+
 export interface EngineConfig {
   vtApiKey: string | null;
   policyMode: "tri" | "strict" | "observe";
@@ -116,6 +130,8 @@ export interface EngineConfig {
   rdapTimeoutMs: number;
   httpPort: number;
   soundEnabled: boolean;
+  /** Operator-defined official hosts: host → brand/subject */
+  customBrands: CustomBrand[];
 }
 
 export const DEFAULT_CONFIG: EngineConfig = {
@@ -129,4 +145,5 @@ export const DEFAULT_CONFIG: EngineConfig = {
   rdapTimeoutMs: 3000,
   httpPort: 7832,
   soundEnabled: true,
+  customBrands: [],
 };

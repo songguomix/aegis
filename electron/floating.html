@@ -368,6 +368,33 @@
       .bar:not(.has-domain):not(.has-review) .open {
         margin-left: 0;
       }
+      .sound {
+        -webkit-app-region: no-drag;
+        flex-shrink: 0;
+        appearance: none;
+        border: 1px solid rgba(17, 24, 39, 0.08);
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.72);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        font-size: 12px;
+        line-height: 1;
+        transition:
+          background 0.2s var(--soft),
+          transform 0.3s var(--spring),
+          opacity 0.2s ease;
+      }
+      .sound:hover {
+        background: #fff;
+        transform: translateY(-1px);
+      }
+      .sound.off {
+        opacity: 0.4;
+      }
       .open:hover {
         background: #fff;
         transform: translateY(-1px) scale(1.04);
@@ -457,6 +484,7 @@
           <button class="act no" id="btn-block" type="button">拦截</button>
         </div>
       </div>
+      <button class="sound" id="btn-sound" title="Sound on/off" aria-label="Sound">🔔</button>
       <button class="open" id="btn-open" title="Open Aegis" aria-label="Open">
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path
@@ -470,6 +498,7 @@
       </button>
     </div>
 
+    <script src="./sound.js"></script>
     <script>
       if (new URLSearchParams(location.search).get("preview") === "1") {
         document.body.classList.add("preview");
@@ -558,6 +587,11 @@
           tag.className = "tag " + decision;
           tag.textContent = decision;
           host.textContent = hostname || "";
+          try {
+            window.AegisSound?.play(decision);
+          } catch {
+            /* ignore */
+          }
 
           bar.classList.remove("has-domain", "has-review");
           void bar.getBoundingClientRect();
@@ -616,6 +650,11 @@
             tag.className = "tag " + decision;
             tag.textContent = decision;
             setLight(decision);
+            try {
+              window.AegisSound?.play(decision);
+            } catch {
+              /* ignore */
+            }
             flash(decision);
             setTimeout(() => {
               hideSlot();
@@ -636,6 +675,20 @@
           e.stopPropagation();
           resolve("block");
         });
+
+        const btnSound = document.getElementById("btn-sound");
+        function paintSound() {
+          const on = window.AegisSound ? window.AegisSound.isEnabled() : true;
+          btnSound.classList.toggle("off", !on);
+          btnSound.textContent = on ? "🔔" : "🔕";
+          btnSound.title = on ? "Sound on (click to mute)" : "Sound off (click to enable)";
+        }
+        btnSound.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (window.AegisSound) window.AegisSound.setEnabled(!window.AegisSound.isEnabled());
+          paintSound();
+        });
+        paintSound();
 
         async function refresh() {
           try {

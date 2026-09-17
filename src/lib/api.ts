@@ -111,6 +111,15 @@ export interface IntegrationInfo {
   mcpEntry: string;
 }
 
+export interface DeployBundle {
+  name: string;
+  generatedAt: string;
+  mcpEntry: string;
+  mcpCommand: string;
+  mcpConfig: { mcpServers: Record<string, { command: string; args: string[] }> };
+  files: { filename: string; content: string; mediaType: string }[];
+}
+
 export interface EngineConfigView {
   vtApiKey: string | null;
   hasVtKey: boolean;
@@ -268,4 +277,14 @@ export const api = {
     request<{ ok: boolean; cleared: boolean }>("/session-trust/%2A", {
       method: "DELETE",
     }),
+  mcpDeployBundle: () => request<DeployBundle>("/mcp-deploy/bundle"),
+  mcpDeployZipUrl: async () => {
+    const w = window as unknown as { aegis?: { getApiBase?: () => Promise<string> } };
+    const base = w.aegis?.getApiBase
+      ? await w.aegis.getApiBase()
+      : import.meta.env.DEV
+        ? "/api/v1"
+        : "http://127.0.0.1:7832/api/v1";
+    return `${base}/mcp-deploy/bundle.zip`;
+  },
 };

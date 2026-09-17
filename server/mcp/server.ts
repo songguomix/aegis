@@ -20,6 +20,7 @@ import {
   isValidHostname,
 } from "../services/sessionTrust.js";
 import { AGENT_GUARD_POLICY, policyText } from "../services/agentPolicy.js";
+import { buildDeployBundle } from "../services/mcpDeploy.js";
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -207,6 +208,22 @@ export function createMcpServer(): McpServer {
             ),
           },
         ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "export_mcp_bundle",
+    {
+      title: "Export one-click MCP deploy bundle",
+      description:
+        "Return deploy files (mcp JSON, SKILL, README, install.sh) for Claude/Cursor. Does not write client configs unless the user runs install.sh.",
+      inputSchema: {},
+    },
+    async () => {
+      const bundle = buildDeployBundle();
+      return {
+        content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }],
       };
     },
   );

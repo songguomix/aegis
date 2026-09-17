@@ -131,8 +131,8 @@ function createFloatingWindow() {
   const { screen } = require("electron");
   const display = screen.getPrimaryDisplay();
   const { workArea } = display;
-  const width = 340;
-  const height = 52;
+  const width = 420;
+  const height = 56;
 
   floatingWindow = new BrowserWindow({
     width,

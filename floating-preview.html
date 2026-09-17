@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aegis Float Preview</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(900px 420px at 50% -10%, rgba(15, 118, 110, 0.1), transparent 55%),
+          #eef1f4;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        color: #525252;
+      }
+      .wrap {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 32px 16px 48px;
+      }
+      h1 {
+        font-size: 18px;
+        font-weight: 650;
+        color: #171717;
+        margin: 0 0 6px;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0 0 20px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .frame {
+        border: 1px dashed #d4d4d4;
+        border-radius: 20px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.35);
+      }
+      iframe {
+        width: 100%;
+        height: 72px;
+        border: 0;
+        display: block;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Aegis · 顶部毛玻璃悬浮条预览</h1>
+      <p>左侧绿/黄/红状态灯 · 右侧最近域名与判定 · 计数 · 右上角箭头打开主窗口。拖动区域在桌面端生效。</p>
+      <div class="frame">
+        <iframe src="./electron/floating.html?preview=1&port=7832" title="Aegis float"></iframe>
+      </div>
+    </div>
+  </body>
+</html>

@@ -29,23 +29,25 @@ export interface ClientStatus {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function resolveMcpEntry(): string {
+  const __here = path.resolve(__dirname, "..", "..");
   const candidates = [
     path.join(__dirname, "..", "index.js"),
+    path.join(__here, "dist-server", "index.js"),
     path.join(process.cwd(), "dist-server", "index.js"),
     path.join(process.cwd(), "server", "index.ts"),
   ];
   return candidates.find((p) => fs.existsSync(p)) ?? candidates[1];
 }
 
-function mcpConfigJson(entry: string): string {
+function mcpServerEntry(entry: string): { command: string; args: string[] } {
   const isTs = entry.endsWith(".ts");
-  const config = {
-    mcpServers: {
-      aegis: isTs
-        ? { command: "npx", args: ["tsx", entry, "--mcp"] }
-        : { command: "node", args: [entry, "--mcp"] },
-    },
-  };
+  return isTs
+    ? { command: "npx", args: ["tsx", entry, "--mcp"] }
+    : { command: "node", args: [entry, "--mcp"] };
+}
+
+function mcpConfigJson(entry: string): string {
+  const config = { mcpServers: { aegis: mcpServerEntry(entry) } };
   return JSON.stringify(config, null, 2) + "\n";
 }
 
@@ -103,11 +105,15 @@ See also Agent Guard rules in \`SKILL.md\`.
 }
 
 function installSh(entry: string): string {
+  const srv = mcpServerEntry(entry);
+  const command = srv.command;
+  const argsJson = JSON.stringify(srv.args);
   return `#!/usr/bin/env bash
 set -euo pipefail
 ENTRY="${entry}"
+COMMAND="${command}"
+ARGS_JSON='${argsJson}'
 AEGIS_ROOT="$(cd "$(dirname "$0")" && pwd)"
-CFG_JSON='{"mcpServers":{"aegis":{"command":"node","args":["'"$ENTRY"'","--mcp"]}}}'
 
 merge_one() {
   local file="$1"
@@ -120,6 +126,8 @@ merge_one() {
   node -e '
     const fs = require("fs");
     const file = process.argv[1];
+    const command = process.argv[2];
+    const args = JSON.parse(process.argv[3]);
     const raw = fs.readFileSync(file, "utf8");
     let data;
     try { data = JSON.parse(raw); } catch (e) {
@@ -127,13 +135,10 @@ merge_one() {
       process.exit(2);
     }
     data.mcpServers = data.mcpServers || {};
-    data.mcpServers.aegis = {
-      command: "node",
-      args: [process.argv[2], "--mcp"],
-    };
+    data.mcpServers.aegis = { command: command, args: args };
     fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\\n");
     console.log("[ok] merged aegis into", file);
-  ' "$file" "$ENTRY"
+  ' "$file" "$COMMAND" "$ARGS_JSON"
 }
 
 CLAUDE="\${CLAUDE_CONFIG:-$HOME/Library/Application Support/Claude/claude_desktop_config.json}"

@@ -1203,11 +1203,14 @@ export default function App() {
                   <button
                     className="btn"
                     onClick={async () => {
+                      const fromBundle = deployBundle?.files.find(
+                        (f) => f.filename === "mcp.claude.json",
+                      )?.content;
                       const json =
-                        deployBundle?.files.find((f) => f.filename === "mcp.claude.json")
-                          ?.content ?? integration?.mcpConfig
-                          ? JSON.stringify(integration?.mcpConfig, null, 2)
-                          : "";
+                        fromBundle ??
+                        (integration?.mcpConfig
+                          ? JSON.stringify(integration.mcpConfig, null, 2)
+                          : "");
                       await copyText("deploy-json", json);
                     }}
                   >

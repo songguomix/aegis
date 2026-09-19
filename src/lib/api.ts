@@ -89,6 +89,7 @@ export interface IntegrationInfo {
       {
         command: string;
         args: string[];
+        env?: Record<string, string>;
       }
     >;
   };

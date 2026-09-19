@@ -172,9 +172,14 @@ export function createApiRouter(): express.Router {
         : `node ${JSON.stringify(entry)} --mcp`,
       mcpConfig: {
         mcpServers: {
-          aegis: isTs
-            ? { command: "npx", args: ["tsx", entry, "--mcp"] }
-            : { command: "node", args: [entry, "--mcp"] },
+          aegis: {
+            command: isTs ? "npx" : "node",
+            args: isTs ? ["tsx", entry, "--mcp"] : [entry, "--mcp"],
+            env: {
+              AEGIS_DATA_DIR:
+                process.env.AEGIS_DATA_DIR ?? path.join(getProjectRoot(), ".aegis"),
+            },
+          },
         },
       },
       tools: [

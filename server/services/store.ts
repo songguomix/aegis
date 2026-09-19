@@ -92,22 +92,26 @@ export function getConfig(): EngineConfig {
 }
 
 export function updateConfig(patch: Partial<EngineConfig>): EngineConfig {
-  config = { ...config, ...patch };
-  if ("customBrands" in patch) setCustomBrands(config.customBrands);
   ensureDir();
-  // merge-on-write: reload disk first to reduce multi-process clobber
   try {
     if (fs.existsSync(CONFIG_PATH)) {
       const disk = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")) as Partial<EngineConfig>;
-      config = { ...disk, ...config };
+      config = { ...config, ...disk };
     }
   } catch {
     /* ignore */
   }
+  config = { ...config, ...patch };
+  if ("customBrands" in patch) setCustomBrands(config.customBrands);
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), {
     encoding: "utf8",
     mode: 0o600,
   });
+  try {
+    fs.chmodSync(CONFIG_PATH, 0o600);
+  } catch {
+    /* ignore */
+  }
   return config;
 }
 

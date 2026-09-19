@@ -327,6 +327,7 @@ export default function App() {
       const cfg = await api.saveConfig(patch);
       setConfig(cfg);
       setLang(cfg.language);
+      setSettingsDirty(false);
       setToast(L("saved"));
       await refresh();
     } catch (e) {
@@ -938,12 +939,13 @@ export default function App() {
                       <select
                         className="input"
                         value={config.policyMode}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setSettingsDirty(true);
                           setConfig({
                             ...config,
                             policyMode: e.target.value as EngineConfigView["policyMode"],
-                          })
-                        }
+                          });
+                        }}
                       >
                         <option value="tri">{L("policyTri")}</option>
                         <option value="strict">{L("policyStrict")}</option>
@@ -1007,7 +1009,6 @@ export default function App() {
                     <button
                       className="btn"
                       onClick={() => {
-                        setSettingsDirty(false);
                         saveSettings({
                           vtApiKey: config.vtApiKey,
                           policyMode: config.policyMode,
@@ -1090,7 +1091,7 @@ export default function App() {
                       rows={4}
                       placeholder="intranet.corp.example | Acme | Acme Internal"
                       value={customBrandsText}
-                      onChange={(e) => setCustomBrandsText(e.target.value)}
+                      onChange={(e) => { setSettingsDirty(true); setCustomBrandsText(e.target.value); }}
                     />
                     <div className="help">{L("customBrandsHelp")}</div>
                   </div>

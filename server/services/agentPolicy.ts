@@ -25,7 +25,7 @@ export const AGENT_GUARD_POLICY = {
     },
     {
       id: "files",
-      text: "After downloading a file call check_file_hash with its SHA256/SHA1/MD5 before open or execute. block → quarantine/delete, do not run.",
+      text: "After downloading a file: if size ≤ Aegis maxUploadBytes (default 32MB), call upload_scan_file (path or base64) and wait for allow. Otherwise call check_file_hash. block → quarantine/delete, do not run.",
     },
     {
       id: "custom_brands",
@@ -37,6 +37,7 @@ export const AGENT_GUARD_POLICY = {
     "scan_search_results",
     "check_urls_batch",
     "check_file_hash",
+    "upload_scan_file",
     "trust_domain",
     "session_trust",
     "untrust_domain",

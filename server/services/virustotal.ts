@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import type { VirusTotalReport, VtStatus } from "../types.js";
 
@@ -197,7 +198,17 @@ export function primeVtCache(domain: string, value: VirusTotalReport): void {
   memory.set(domain.toLowerCase(), { at: Date.now(), value });
 }
 
-async function vtFetch(path: string, apiKey: string): Promise<Response> {
+export function dropVtCacheKey(domain: string): void {
+  const k = domain.toLowerCase();
+  memory.delete(k);
+  memory.delete(`file:${k}`);
+}
+
+async function vtFetch(
+  path: string,
+  apiKey: string,
+  init: RequestInit = {},
+): Promise<Response> {
   return withVtLock(async () => {
     const now = Date.now();
     if (now < backoffUntil) {
@@ -209,9 +220,148 @@ async function vtFetch(path: string, apiKey: string): Promise<Response> {
     }
     lastCallAt = Date.now();
     return fetch(`https://www.virustotal.com/api/v3${path}`, {
-      headers: { "x-apikey": apiKey, Accept: "application/json" },
+      ...init,
+      headers: { "x-apikey": apiKey, Accept: "application/json", ...(init.headers as object | undefined) },
     });
   });
+}
+
+export interface VtUploadResult {
+  analysisId: string;
+  sha256: string;
+  report: VirusTotalReport;
+  uploaded: boolean;
+}
+
+/** Upload file bytes to VirusTotal and wait for analysis stats. */
+export async function uploadFileVt(
+  data: Buffer,
+  filename: string,
+  apiKey: string | null,
+  opts: { maxBytes?: number; pollAttempts?: number; pollDelayMs?: number } = {},
+): Promise<
+  | { ok: true; value: VtUploadResult }
+  | { ok: false; error: "vt_key_required" | "file_too_large" | "upload_failed" | "analysis_timeout" | "http_error"; maxBytes?: number }
+> {
+  const maxBytes = opts.maxBytes ?? 32 * 1024 * 1024;
+  if (!apiKey) return { ok: false, error: "vt_key_required" };
+  if (data.length > maxBytes) {
+    return { ok: false, error: "file_too_large", maxBytes };
+  }
+
+  const sha256 = crypto.createHash("sha256").update(data).digest("hex");
+  const cacheKey = `file:${sha256}`;
+  const cached = memory.get(cacheKey);
+  if (cached && Date.now() - cached.at < 6 * 60 * 60 * 1000) {
+    return {
+      ok: true,
+      value: { analysisId: "", sha256, report: { ...cached.value, cached: true }, uploaded: false },
+    };
+  }
+
+  try {
+    const form = new FormData();
+    const blob = new Blob([new Uint8Array(data)]);
+    form.append("file", blob, filename || "upload.bin");
+
+    let uploadRes: Response;
+    try {
+      uploadRes = await vtFetch("/files", apiKey, {
+        method: "POST",
+        body: form,
+        headers: {},
+      });
+    } catch {
+      return { ok: false, error: "upload_failed" };
+    }
+
+    if (uploadRes.status === 409 || uploadRes.status === 200) {
+      // already exists or ok
+    } else if (!uploadRes.ok) {
+      if (uploadRes.status === 429) {
+        backoffUntil = Date.now() + 60_000;
+        return { ok: false, error: "upload_failed" };
+      }
+      return { ok: false, error: "upload_failed" };
+    }
+
+    let analysisId = "";
+    try {
+      const body = (await uploadRes.json()) as { data?: { id?: string; type?: string; links?: { self?: string } } };
+      const id = body.data?.id ?? "";
+      if (body.data?.type === "analysis") analysisId = id;
+      else if (id.includes("-")) analysisId = id.split("-")[1] ?? id;
+      else analysisId = id;
+    } catch {
+      analysisId = "";
+    }
+
+    // Prefer direct file report by sha256 (works for already-known files)
+    const attempts = opts.pollAttempts ?? 2;
+    const delay = opts.pollDelayMs ?? 1500;
+    let lastReport: VirusTotalReport | null = null;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const fileRes = await vtFetch(`/files/${sha256}`, apiKey);
+        if (fileRes.ok) {
+          const body = (await fileRes.json()) as {
+            data?: { attributes?: Parameters<typeof reportFromAttributes>[0] };
+          };
+          const attrs = body.data?.attributes ?? {};
+          const stats = attrs.last_analysis_stats ?? {};
+          const done =
+            (stats.harmless ?? 0) + (stats.undetected ?? 0) + (stats.malicious ?? 0) + (stats.suspicious ?? 0) >
+            0;
+          lastReport = reportFromAttributes(
+            attrs,
+            `https://www.virustotal.com/gui/file/${sha256}`,
+          );
+          if (done || i === attempts - 1) {
+            memory.set(cacheKey, { at: Date.now(), value: lastReport });
+            persistDisk();
+            return {
+              ok: true,
+              value: {
+                analysisId: analysisId || "",
+                sha256,
+                report: lastReport,
+                uploaded: true,
+              },
+            };
+          }
+        }
+      } catch {
+        /* retry */
+      }
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, delay));
+    }
+
+    // Pending analysis: still return a usable report so agents get a decision path
+    const report: VirusTotalReport = lastReport ?? {
+      status: "unknown",
+      malicious: 0,
+      suspicious: 0,
+      harmless: 0,
+      undetected: 0,
+      reputation: null,
+      categories: [],
+      cached: false,
+      permalink: `https://www.virustotal.com/gui/file/${sha256}`,
+    };
+    memory.set(cacheKey, { at: Date.now(), value: report });
+    persistDisk();
+    return {
+      ok: true,
+      value: {
+        analysisId: analysisId || "",
+        sha256,
+        report,
+        uploaded: true,
+      },
+    };
+  } catch {
+    return { ok: false, error: "upload_failed" };
+  }
 }
 
 function reportFromAttributes(attrs: {

@@ -68,6 +68,8 @@ const dict = {
     enableRdapHelp: "Live registrant lookup (best effort). Disable for offline.",
     enableSound: "Notification sounds",
     enableSoundHelp: "Play tones on allow / review / block in the floating bar.",
+    maxUploadMB: "VT upload max (MB)",
+    maxUploadHelp: "Agent Guard: files under this size can use upload_scan_file (default 32).",
     customBrands: "Custom official domains",
     customBrandsHelp:
       "One per line: host | brand | subject — treated as authority-registry matches.",
@@ -184,6 +186,8 @@ const dict = {
     enableRdapHelp: "在线查询注册主体（尽力而为）。离线可关闭。",
     enableSound: "提示音",
     enableSoundHelp: "悬浮条在放行 / 待审 / 拦截时播放提示音。",
+    maxUploadMB: "VT 上传上限 (MB)",
+    maxUploadHelp: "Agent Guard：小于该体积的文件可用 upload_scan_file（默认 32）。",
     customBrands: "自定义权威域名",
     customBrandsHelp: "每行：host | brand | subject，按官方主体库对待。",
     sessionTrust: "会话信任",

@@ -572,8 +572,16 @@ select.input {
   text-align: right;
 }
 
-.table td:nth-child(2) {
+/* Dashboard URL table only */
+.table.cols-url td:nth-child(2) {
   width: 100%;
+}
+
+.table td.mono {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .score {
@@ -638,13 +646,18 @@ select.input {
 
 .settings-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(300px, 1fr) minmax(280px, 1.05fr);
   gap: 12px;
   align-items: start;
 }
 
 .settings-layout .panel {
   min-width: 0;
+}
+
+.settings-layout .form-grid-2.policy-row {
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 
 /* Integrate */
@@ -936,6 +949,13 @@ textarea.input::selection {
   flex-shrink: 0;
 }
 
+.glass-soft {
+  background: #fafafa;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
 .toast {
   position: fixed;
   bottom: 20px;
@@ -947,6 +967,19 @@ textarea.input::selection {
   background: #171717;
   color: #fff;
   border: 1px solid #171717;
+  max-width: min(420px, calc(100vw - 40px));
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.toast.error {
+  bottom: 20px;
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.toast.info {
+  bottom: 68px;
 }
 
 /* Live check hero strip */

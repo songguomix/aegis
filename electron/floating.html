@@ -240,7 +240,14 @@
           padding 0.3s var(--soft),
           transform 0.4s var(--spring);
       }
-      .bar.has-domain .slot,
+      .bar.has-review .counts .count {
+  min-width: 28px;
+  padding: 2px 4px;
+}
+.bar.has-review .counts .count .l {
+  display: none;
+}
+.bar.has-domain .slot,
       .bar.has-review .slot {
         flex: 1 1 auto;
         max-width: none;
@@ -453,8 +460,8 @@
         <span class="tag" id="tag"></span>
         <span class="host" id="host" title="Open Aegis"></span>
         <div class="acts" id="acts">
-          <button class="act ok" id="btn-allow" type="button">放行</button>
-          <button class="act no" id="btn-block" type="button">拦截</button>
+          <button class="act ok" id="btn-allow" type="button">Allow</button>
+          <button class="act no" id="btn-block" type="button">Block</button>
         </div>
       </div>
       <button class="open" id="btn-open" title="Open Aegis" aria-label="Open">
@@ -681,6 +688,11 @@
               rev?.stats?.pending ?? health?.reviews?.pending ?? health?.stats?.review ?? 0,
             );
             bumpCount("block", health?.stats?.block ?? 0);
+            try {
+              if (window.AegisSound && typeof health?.language === "string") {
+                /* optional */
+              }
+            } catch { /* ignore */ }
             syncSoundFromServer(health?.soundEnabled !== false);
 
             // Pending reviews take priority on the float (human or AI can act)
@@ -723,6 +735,16 @@
           }
         }
 
+        async function paintFloatLang() {
+          try {
+            const res = await fetch(base + "/config");
+            const cfg = await res.json();
+            const zh = cfg.language === "zh";
+            btnAllow.textContent = zh ? "放行" : "Allow";
+            btnBlock.textContent = zh ? "拦截" : "Block";
+          } catch { /* keep EN */ }
+        }
+
         function openMain() {
           apiBridge()?.openMain?.();
         }
@@ -733,7 +755,9 @@
         };
 
         refresh();
+paintFloatLang();
         setInterval(refresh, 2000);
+        setInterval(paintFloatLang, 8000);
 
         if (new URLSearchParams(location.search).get("demo") === "1") {
           setInterval(() => {

@@ -297,8 +297,9 @@ export async function uploadFileVt(
     }
 
     // Prefer direct file report by sha256 (works for already-known files)
-    const attempts = opts.pollAttempts ?? 15;
-    const delay = opts.pollDelayMs ?? 2000;
+    const attempts = opts.pollAttempts ?? 2;
+    const delay = opts.pollDelayMs ?? 1500;
+    let lastReport: VirusTotalReport | null = null;
     for (let i = 0; i < attempts; i++) {
       try {
         const fileRes = await vtFetch(`/files/${sha256}`, apiKey);
@@ -311,19 +312,19 @@ export async function uploadFileVt(
           const done =
             (stats.harmless ?? 0) + (stats.undetected ?? 0) + (stats.malicious ?? 0) + (stats.suspicious ?? 0) >
             0;
+          lastReport = reportFromAttributes(
+            attrs,
+            `https://www.virustotal.com/gui/file/${sha256}`,
+          );
           if (done || i === attempts - 1) {
-            const report = reportFromAttributes(
-              attrs,
-              `https://www.virustotal.com/gui/file/${sha256}`,
-            );
-            memory.set(cacheKey, { at: Date.now(), value: report });
+            memory.set(cacheKey, { at: Date.now(), value: lastReport });
             persistDisk();
             return {
               ok: true,
               value: {
                 analysisId: analysisId || "",
                 sha256,
-                report,
+                report: lastReport,
                 uploaded: true,
               },
             };
@@ -332,18 +333,11 @@ export async function uploadFileVt(
       } catch {
         /* retry */
       }
-      if (analysisId) {
-        try {
-          await vtFetch(`/analyses/${analysisId}`, apiKey);
-        } catch {
-          /* ignore */
-        }
-      }
       if (i < attempts - 1) await new Promise((r) => setTimeout(r, delay));
     }
 
-    // timeout: return unknown with permalink
-    const report: VirusTotalReport = {
+    // Pending analysis: still return a usable report so agents get a decision path
+    const report: VirusTotalReport = lastReport ?? {
       status: "unknown",
       malicious: 0,
       suspicious: 0,
@@ -354,7 +348,17 @@ export async function uploadFileVt(
       cached: false,
       permalink: `https://www.virustotal.com/gui/file/${sha256}`,
     };
-    return { ok: false, error: "analysis_timeout" };
+    memory.set(cacheKey, { at: Date.now(), value: report });
+    persistDisk();
+    return {
+      ok: true,
+      value: {
+        analysisId: analysisId || "",
+        sha256,
+        report,
+        uploaded: true,
+      },
+    };
   } catch {
     return { ok: false, error: "upload_failed" };
   }

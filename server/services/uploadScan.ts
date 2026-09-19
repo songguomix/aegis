@@ -96,6 +96,8 @@ export async function runUploadScan(
 
   const upload = await uploadFileVt(data, fileName || "upload.bin", config.vtApiKey, {
     maxBytes,
+    pollAttempts: 2,
+    pollDelayMs: 1200,
   });
   if (!upload) {
     return { ok: false, error: "upload_failed" };

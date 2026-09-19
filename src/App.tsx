@@ -971,6 +971,23 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="form-row">
+                    <label>{L("maxUploadMB")}</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={Math.round((config.maxUploadBytes ?? 33554432) / (1024 * 1024))}
+                      onChange={(e) => {
+                        setSettingsDirty(true);
+                        const mb = Math.min(64, Math.max(1, Number(e.target.value) || 32));
+                        setConfig({ ...config, maxUploadBytes: mb * 1024 * 1024 });
+                      }}
+                    />
+                    <div className="help">{L("maxUploadHelp")}</div>
+                  </div>
+
                   <div className="toggle-row">
                     <div>
                       <div className="title">{L("enableRdap")}</div>
@@ -1017,6 +1034,7 @@ export default function App() {
                           allowlist: config.allowlist,
                           denylist: config.denylist,
                           soundEnabled: config.soundEnabled !== false,
+                          maxUploadBytes: config.maxUploadBytes ?? 33554432,
                           customBrands: customBrandsText
                             .split("\n")
                             .map((line) => line.trim())

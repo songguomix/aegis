@@ -104,6 +104,10 @@ export interface FileGateResult {
   checkedAt: string;
   context?: string;
   kind: "file";
+  analysisId?: string;
+  uploaded?: boolean;
+  bytes?: number;
+  sha256?: string;
 }
 
 export interface CustomBrand {
@@ -130,6 +134,8 @@ export interface EngineConfig {
   rdapTimeoutMs: number;
   httpPort: number;
   soundEnabled: boolean;
+  /** Max bytes for VirusTotal file upload scan (default 32MB) */
+  maxUploadBytes: number;
   /** Operator-defined official hosts: host → brand/subject */
   customBrands: CustomBrand[];
 }
@@ -145,5 +151,6 @@ export const DEFAULT_CONFIG: EngineConfig = {
   rdapTimeoutMs: 3000,
   httpPort: 7832,
   soundEnabled: true,
+  maxUploadBytes: 32 * 1024 * 1024,
   customBrands: [],
 };

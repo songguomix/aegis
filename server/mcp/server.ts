@@ -3,6 +3,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { runGate } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
+import { scanDownloadedFile } from "../services/fileUploadScan.js";
+import { runUploadScan } from "../services/uploadScan.js";
 import { getConfig, appendHistory, stats, updateConfig } from "../services/store.js";
 import { lookupOfficial } from "../services/registry.js";
 import {
@@ -248,6 +250,48 @@ export function createMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "scan_downloaded_file",
+    {
+      title: "Scan small downloaded file via VirusTotal",
+      description:
+        "Agent Guard: after download, scan a local file ≤32MB (free-tier). Computes SHA256, looks up VirusTotal, uploads unknown samples when API key is set, returns allow/review/block + verdict for the agent.",
+      inputSchema: {
+        path: z.string().describe("Absolute path of the downloaded file"),
+        fileName: z.string().optional(),
+      },
+    },
+    async ({ path: filePath, fileName }) => {
+      const result = await scanDownloadedFile(filePath, getConfig(), { fileName });
+      appendHistory({
+        id: result.id,
+        url: `file:${result.hash.slice(0, 12)}…`,
+        hostname: fileName ?? result.hash.slice(0, 16),
+        decision: result.decision,
+        score: result.score,
+        reasons: result.reasons,
+        authority: {
+          official: false,
+          brand: null,
+          subject: null,
+          category: "file",
+          rdap: { status: "skipped" as const, registrant: null, organization: null },
+          lookalikeOf: null,
+          punycode: false,
+          mixedScript: false,
+          allowlisted: false,
+          denylisted: false,
+        },
+        virusTotal: result.virusTotal,
+        checkedAt: result.checkedAt,
+        kind: "file",
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
     "check_file_hash",
     {
       title: "Check file hash with VirusTotal",
@@ -273,6 +317,70 @@ export function createMcpServer(): McpServer {
           brand: null,
           subject: null,
           category: "file",
+          rdap: { status: "skipped" as const, registrant: null, organization: null },
+          lookalikeOf: null,
+          punycode: false,
+          mixedScript: false,
+          allowlisted: false,
+          denylisted: false,
+        },
+        virusTotal: result.virusTotal,
+        checkedAt: result.checkedAt,
+        context: result.context,
+        kind: "file",
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "upload_scan_file",
+    {
+      title: "Upload small file to VirusTotal and return scan result",
+      description:
+        "Agent Guard: after downloading a small file (within maxUploadBytes, default 32MB), upload it to VirusTotal for scanning. Provide local path or base64+filename. Returns allow/review/block + VT stats. Do not open/execute files until allow.",
+      inputSchema: {
+        path: z.string().optional().describe("Absolute path to downloaded file"),
+        filename: z.string().optional(),
+        base64: z.string().optional().describe("Base64 file body if no path"),
+        context: z.string().optional(),
+      },
+    },
+    async ({ path: filePath, filename, base64, context }) => {
+      const outcome = await runUploadScan(
+        { path: filePath, filename, base64, context },
+        getConfig(),
+      );
+      if (!outcome.ok) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: outcome.error,
+                maxBytes: outcome.maxBytes,
+                message: outcome.message,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+      const result = outcome.result;
+      appendHistory({
+        id: result.id,
+        url: `file:${(result.sha256 ?? result.hash).slice(0, 12)}…`,
+        hostname: result.fileName ?? (result.sha256 ?? result.hash).slice(0, 16),
+        decision: result.decision,
+        score: result.score,
+        reasons: result.reasons,
+        authority: {
+          official: false,
+          brand: null,
+          subject: null,
+          category: "file-upload",
           rdap: { status: "skipped" as const, registrant: null, organization: null },
           lookalikeOf: null,
           punycode: false,

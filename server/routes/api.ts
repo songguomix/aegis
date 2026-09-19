@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { runGate, parseUrl } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
+import { scanDownloadedFile } from "../services/fileUploadScan.js";
+import { runUploadScan } from "../services/uploadScan.js";
 import {
   appendHistory,
   clearHistory,
@@ -235,6 +237,18 @@ export function createApiRouter(): express.Router {
           input: ["id: string", "decision: allow|block", "alwaysAllow?: boolean"],
         },
         {
+          name: "scan_downloaded_file",
+          description:
+            "After download: local path ≤ maxUploadBytes → VT upload/scan, returns allow/review/block for the agent.",
+          input: ["path: string", "fileName?: string"],
+        },
+        {
+          name: "upload_scan_file",
+          description:
+            "Upload small downloaded file (≤ maxUploadBytes) to VirusTotal; returns allow/review/block to the agent.",
+          input: ["path?: string", "base64?: string", "filename?: string"],
+        },
+        {
           name: "verify_domain",
           description: "Authority-only domain verification.",
           input: ["domain: string"],
@@ -366,6 +380,113 @@ export function createApiRouter(): express.Router {
     }
     const result = await runGate(parsed.data.url, getConfig(), parsed.data.context);
     appendHistory(result);
+    res.json(result);
+  });
+
+  router.post("/upload-scan", async (req, res) => {
+    const parsed = z
+      .object({
+        filename: z.string().optional(),
+        base64: z.string().optional(),
+        path: z.string().optional(),
+        context: z.string().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const outcome = await runUploadScan(parsed.data, getConfig());
+    if (!outcome.ok) {
+      const code =
+        outcome.error === "file_too_large"
+          ? 413
+          : outcome.error === "vt_key_required"
+            ? 400
+            : outcome.error === "path_not_found" || outcome.error === "empty_file" || outcome.error === "invalid_input" || outcome.error === "invalid_base64"
+              ? 400
+              : 502;
+      res.status(code).json({
+        error: outcome.error,
+        maxBytes: outcome.maxBytes,
+        message: outcome.message,
+      });
+      return;
+    }
+    const result = outcome.result;
+    appendHistory({
+      id: result.id,
+      url: `file:${(result.sha256 ?? result.hash).slice(0, 12)}…`,
+      hostname: result.fileName ?? (result.sha256 ?? result.hash).slice(0, 16),
+      decision: result.decision,
+      score: result.score,
+      reasons: result.reasons,
+      authority: {
+        official: false,
+        brand: null,
+        subject: null,
+        category: "file-upload",
+        rdap: { status: "skipped" as const, registrant: null, organization: null },
+        lookalikeOf: null,
+        punycode: false,
+        mixedScript: false,
+        allowlisted: false,
+        denylisted: false,
+      },
+      virusTotal: result.virusTotal,
+      checkedAt: result.checkedAt,
+      context: result.context,
+      kind: "file",
+    });
+    res.json(result);
+  });
+
+  /** Small-file VirusTotal upload scan for agent downloads. */
+  router.post("/scan-file", async (req, res) => {
+    const parsed = z
+      .object({
+        path: z.string().min(1),
+        fileName: z.string().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const result = await scanDownloadedFile(parsed.data.path, getConfig(), {
+      fileName: parsed.data.fileName ?? null,
+    });
+    if (result.reasons.some((r) => r.code === "file_not_found")) {
+      res.status(404).json(result);
+      return;
+    }
+    if (result.reasons.some((r) => r.code === "file_too_large")) {
+      res.status(400).json(result);
+      return;
+    }
+    appendHistory({
+      id: result.id,
+      url: `file:${result.hash.slice(0, 12)}…`,
+      hostname: result.fileName ?? result.hash.slice(0, 16),
+      decision: result.decision,
+      score: result.score,
+      reasons: result.reasons,
+      authority: {
+        official: false,
+        brand: null,
+        subject: null,
+        category: "file",
+        rdap: { status: "skipped" as const, registrant: null, organization: null },
+        lookalikeOf: null,
+        punycode: false,
+        mixedScript: false,
+        allowlisted: false,
+        denylisted: false,
+      },
+      virusTotal: result.virusTotal,
+      checkedAt: result.checkedAt,
+      kind: "file",
+    });
     res.json(result);
   });
 

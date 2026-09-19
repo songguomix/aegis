@@ -134,6 +134,7 @@ export interface EngineConfigView {
   httpPort: number;
   soundEnabled?: boolean;
   customBrands?: CustomBrand[];
+  maxUploadBytes?: number;
 }
 
 export interface SessionTrustEntry {

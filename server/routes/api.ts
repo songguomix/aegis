@@ -265,7 +265,7 @@ export function createApiRouter(): express.Router {
 
   router.get("/session-token", (req, res) => {
     const origin = req.headers.origin;
-    if (!origin || !/^https?:\/\/(127\.0.0\.1|localhost)(:\d+)?$/.test(origin)) {
+    if (origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
       res.status(403).json({ error: "forbidden" });
       return;
     }

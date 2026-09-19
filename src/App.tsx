@@ -484,7 +484,7 @@ export default function App() {
                   <div className="empty">{L("noResults")}</div>
                 ) : (
                   <div className="list-scroll">
-                    <table className="table">
+                    <table className="table cols-url">
                       <thead>
                         <tr>
                           <th>{L("decision")}</th>
@@ -724,7 +724,7 @@ export default function App() {
                         <td>
                           <DecisionPill decision={item.decision} />
                         </td>
-                        <td className="mono">{item.hostname}</td>
+                        <td className="mono" title={item.hostname}>{item.hostname}</td>
                         <td>{item.virusTotal?.status ?? "—"}</td>
                         <td>
                           <div className="score">{item.score}</div>
@@ -890,7 +890,7 @@ export default function App() {
                           <td>
                             <DecisionPill decision={item.decision} />
                           </td>
-                          <td className="mono">{item.hostname}</td>
+                          <td className="mono" title={item.hostname}>{item.hostname}</td>
                           <td>{item.score}</td>
                           <td>{item.virusTotal?.status ?? "—"}</td>
                           <td>{item.authority?.brand ?? "—"}</td>
@@ -933,7 +933,7 @@ export default function App() {
                     <div className="help">{L("vtKeyHelp")}</div>
                   </div>
 
-                  <div className="form-grid-2">
+                  <div className="form-grid-2 policy-row">
                     <div className="form-row">
                       <label>{L("policy")}</label>
                       <select
@@ -1163,27 +1163,27 @@ export default function App() {
                 <ul className="tool-list" style={{ marginTop: 8 }}>
                   <li>
                     <code>preflight</code>
-                    <span>访问任何 URL 前必须 check_url / scan_search_results</span>
+                    <span>{L("agPreflight")}</span>
                   </li>
                   <li>
                     <code>allow</code>
-                    <span>可继续</span>
+                    <span>{L("agAllow")}</span>
                   </li>
                   <li>
                     <code>block</code>
-                    <span>停止，不得绕过</span>
+                    <span>{L("agBlock")}</span>
                   </li>
                   <li>
                     <code>review</code>
-                    <span>禁止访问；等人批或 resolve_review；可 trust_domain</span>
+                    <span>{L("agReview")}</span>
                   </li>
                   <li>
                     <code>search</code>
-                    <span>列表链接用 scan_search_results，只跟进 allow</span>
+                    <span>{L("agSearch")}</span>
                   </li>
                   <li>
                     <code>files</code>
-                    <span>下载后 check_file_hash，block 则隔离</span>
+                    <span>{L("agFiles")}</span>
                   </li>
                 </ul>
               </section>
@@ -1383,11 +1383,11 @@ export default function App() {
         </div>
 
         {error && (
-          <div className="toast" style={{ background: "#b91c1c", borderColor: "#b91c1c" }}>
+          <div className="toast error">
             {L("error")}: {error}
           </div>
         )}
-        {toast && <div className="toast">{toast}</div>}
+        {toast && <div className="toast info">{toast}</div>}
       </main>
     </div>
   );

@@ -263,7 +263,7 @@ ipcMain.on("aegis:float-anchor-lock", () => {
 ipcMain.on("aegis:float-size", (_e, compact) => {
   if (!floatingWindow || floatingWindow.isDestroyed()) return;
   floatCompact = Boolean(compact);
-  const targetWidth = floatCompact ? 228 : 400;
+  const targetWidth = floatCompact ? 228 : 500;
   const height = 52;
 
   // Stable visual center: use current center at animation start; never re-jump after.

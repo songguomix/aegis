@@ -10,7 +10,9 @@ import {
   clearHistory,
   getConfig,
   getHistory,
+  getLocalToken,
   getProjectRoot,
+  readPortFile,
   stats,
   updateConfig,
 } from "../services/store.js";
@@ -53,7 +55,7 @@ const configSchema = z.object({
   customBrands: z
     .array(
       z.object({
-        host: z.string().min(1),
+        host: z.string().min(1).refine((h) => isValidHostname(h), "invalid_host"),
         brand: z.string().min(1),
         subject: z.string().optional().default(""),
       }),
@@ -110,6 +112,7 @@ export function createApiRouter(): express.Router {
         note: z.string().optional(),
         by: z.enum(["user", "agent"]).optional(),
         alwaysAllow: z.boolean().optional(),
+        sessionTrust: z.boolean().optional(),
       })
       .safeParse(req.body);
     if (!parsed.success) {
@@ -121,20 +124,38 @@ export function createApiRouter(): express.Router {
       res.status(404).json({ error: "not_found" });
       return;
     }
-    const item = resolveReview(req.params.id, parsed.data.decision, {
+    const { item, changed } = resolveReview(req.params.id, parsed.data.decision, {
       by: parsed.data.by ?? "user",
       note: parsed.data.note,
     });
+    if (!changed) {
+      res.status(409).json({ error: "not_pending", review: item });
+      return;
+    }
     if (parsed.data.decision === "allow" && parsed.data.alwaysAllow) {
       const cfg = getConfig();
-      if (!cfg.allowlist.includes(existing.hostname)) {
+      if (
+        !cfg.allowlist.includes(existing.hostname) &&
+        isValidHostname(existing.hostname)
+      ) {
         updateConfig({ allowlist: [...cfg.allowlist, existing.hostname] });
       }
     }
     if (parsed.data.decision === "block" && parsed.data.alwaysAllow) {
       const cfg = getConfig();
-      if (!cfg.denylist.includes(existing.hostname)) {
+      if (
+        !cfg.denylist.includes(existing.hostname) &&
+        isValidHostname(existing.hostname)
+      ) {
         updateConfig({ denylist: [...cfg.denylist, existing.hostname] });
+      }
+    }
+    if (parsed.data.decision === "allow" && parsed.data.sessionTrust !== false) {
+      if (isValidHostname(existing.hostname)) {
+        trustDomain(existing.hostname, {
+          source: (parsed.data.by ?? "user") as "user" | "agent",
+          reason: `review ${existing.id}`,
+        });
       }
     }
     res.json(item);
@@ -142,7 +163,7 @@ export function createApiRouter(): express.Router {
 
   router.get("/integration", (_req, res) => {
     const entry = resolveMcpEntry();
-    const port = getConfig().httpPort ?? 7832;
+    const port = readPortFile() ?? getConfig().httpPort ?? 7832;
     const base = `http://127.0.0.1:${port}/api/v1`;
     const isTs = entry.endsWith(".ts");
     res.json({
@@ -151,9 +172,14 @@ export function createApiRouter(): express.Router {
         : `node ${JSON.stringify(entry)} --mcp`,
       mcpConfig: {
         mcpServers: {
-          aegis: isTs
-            ? { command: "npx", args: ["tsx", entry, "--mcp"] }
-            : { command: "node", args: [entry, "--mcp"] },
+          aegis: {
+            command: isTs ? "npx" : "node",
+            args: isTs ? ["tsx", entry, "--mcp"] : [entry, "--mcp"],
+            env: {
+              AEGIS_DATA_DIR:
+                process.env.AEGIS_DATA_DIR ?? path.join(getProjectRoot(), ".aegis"),
+            },
+          },
         },
       },
       tools: [
@@ -235,6 +261,20 @@ export function createApiRouter(): express.Router {
       projectRoot: getProjectRoot(),
       mcpEntry: entry,
     });
+  });
+
+  router.get("/session-token", (req, res) => {
+    const origin = req.headers.origin;
+    if (origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    const token = getLocalToken();
+    if (!token) {
+      res.status(500).json({ error: "token_missing" });
+      return;
+    }
+    res.json({ token });
   });
 
   router.get("/agent-policy", (_req, res) => {

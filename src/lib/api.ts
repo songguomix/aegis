@@ -89,6 +89,7 @@ export interface IntegrationInfo {
       {
         command: string;
         args: string[];
+        env?: Record<string, string>;
       }
     >;
   };
@@ -197,6 +198,7 @@ export interface Health {
 }
 
 const FALLBACK = "http://127.0.0.1:7832/api/v1";
+let cachedToken: string | null = null;
 
 async function apiBase(): Promise<string> {
   const w = window as unknown as { aegis?: { getApiBase?: () => Promise<string> } };
@@ -210,13 +212,49 @@ async function apiBase(): Promise<string> {
   return import.meta.env.DEV ? "/api/v1" : FALLBACK;
 }
 
+export async function ensureApiToken(): Promise<string | null> {
+  if (cachedToken) return cachedToken;
+  const w = window as unknown as { aegis?: { getToken?: () => Promise<string | null> } };
+  if (w.aegis?.getToken) {
+    try {
+      const t = await w.aegis.getToken();
+      if (t) {
+        cachedToken = t;
+        return t;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  try {
+    const base = await apiBase();
+    const res = await fetch(`${base}/session-token`);
+    if (res.ok) {
+      const d = (await res.json()) as { token?: string };
+      if (d.token) {
+        cachedToken = d.token;
+        return d.token;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const base = await apiBase();
   const url = `${base}${path}`;
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    ...init,
-  });
+  const method = (init?.method ?? "GET").toUpperCase();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (method !== "GET" && method !== "HEAD") {
+    const token = await ensureApiToken();
+    if (token) headers["X-Aegis-Token"] = token;
+  }
+  const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(body || `HTTP ${res.status}`);
@@ -255,7 +293,12 @@ export const api = {
   resolveReview: (
     id: string,
     decision: "allow" | "block",
-    opts?: { alwaysAllow?: boolean; note?: string; by?: "user" | "agent" },
+    opts?: {
+      alwaysAllow?: boolean;
+      note?: string;
+      by?: "user" | "agent";
+      sessionTrust?: boolean;
+    },
   ) =>
     request<ReviewItem>(`/reviews/${id}/resolve`, {
       method: "POST",

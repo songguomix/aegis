@@ -608,17 +608,26 @@
           btnAllow.disabled = true;
           btnBlock.disabled = true;
           try {
-            const port2 = port;
-            await fetch(`http://127.0.0.1:${port2}/api/v1/reviews/${id}/resolve`, {
+            let token = null;
+            try {
+              token = await window.aegisFloating?.getToken?.();
+            } catch {
+              /* ignore */
+            }
+            const res = await fetch(`http://127.0.0.1:${port}/api/v1/reviews/${id}/resolve`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                ...(token ? { "X-Aegis-Token": token } : {}),
+              },
               body: JSON.stringify({
                 decision,
                 by: "user",
-                alwaysAllow: decision === "allow",
+                alwaysAllow: false,
+                sessionTrust: decision === "allow",
               }),
             });
-            // brief confirmation state, then collapse — same window anchor
+            if (!res.ok) throw new Error(await res.text());
             tag.className = "tag " + decision;
             tag.textContent = decision;
             setLight(decision);

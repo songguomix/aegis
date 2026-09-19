@@ -153,6 +153,25 @@ export function createMcpServer(): McpServer {
           isError: true,
         };
       }
+      const { detectLookalike } = await import("../services/lookalike.js");
+      const { officialHostnames } = await import("../services/registry.js");
+      const look = detectLookalike(hostname, officialHostnames());
+      if (look.lookalikeOf && look.reason && look.reason !== "exact_official") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: "lookalike_blocked",
+                hostname,
+                lookalikeOf: look.lookalikeOf,
+                hint: "Session trust cannot override lookalike risk. Human must allowlist after review.",
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
       const entry = trustDomain(hostname, { reason, source: "agent" });
       return { content: [{ type: "text", text: JSON.stringify(entry, null, 2) }] };
     },
@@ -369,8 +388,19 @@ export function createMcpServer(): McpServer {
           content: [{ type: "text", text: JSON.stringify({ error: "not_found", id }) }],
         };
       }
-      const item = resolveReview(id, decision, { by: "agent", note });
-      if (alwaysAllow && existing.hostname) {
+      const { item, changed } = resolveReview(id, decision, { by: "agent", note });
+      if (!changed) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ error: "not_pending", review: item }),
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (alwaysAllow && existing.hostname && isValidHostname(existing.hostname)) {
         const cfg = getConfig();
         const list = decision === "allow" ? cfg.allowlist : cfg.denylist;
         if (!list.includes(existing.hostname)) {

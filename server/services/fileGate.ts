@@ -136,10 +136,10 @@ function decideFile(
 ): Decision {
   if (vtStatus === "malicious") return "block";
   if (config.policyMode === "observe") {
-    if (vtStatus === "suspicious" || vtStatus === "unknown" || vtStatus === "degraded") {
+    if (vtStatus === "suspicious" || vtStatus === "unknown" || vtStatus === "degraded" || vtStatus === "error") {
       return "review";
     }
-    return "allow";
+    return vtStatus === "clean" ? "allow" : "review";
   }
   if (config.policyMode === "strict") {
     return vtStatus === "clean" ? "allow" : "block";

@@ -140,17 +140,17 @@ export function resolveReview(
   id: string,
   decision: "allow" | "block",
   opts: { by?: "user" | "agent"; note?: string } = {},
-): ReviewItem | null {
+): { item: ReviewItem | null; changed: boolean } {
   expireStale();
   const it = items.get(id);
-  if (!it) return null;
-  if (it.status !== "pending") return it;
+  if (!it) return { item: null, changed: false };
+  if (it.status !== "pending") return { item: it, changed: false };
   it.status = decision === "allow" ? "allowed" : "blocked";
   it.resolvedAt = new Date().toISOString();
   it.resolvedBy = opts.by ?? "agent";
   it.note = opts.note;
   persist();
-  return it;
+  return { item: it, changed: true };
 }
 
 export function reviewStats(): { pending: number; allowed: number; blocked: number } {

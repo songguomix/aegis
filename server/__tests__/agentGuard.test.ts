@@ -87,6 +87,24 @@ describe("session trust", () => {
     expect(isValidHostname("partner.example")).toBe(true);
   });
 
+  it("session trust does not override lookalike hard-block", async () => {
+    primeVtCache("guthub.com", {
+      status: "clean",
+      malicious: 0,
+      suspicious: 0,
+      harmless: 20,
+      undetected: 5,
+      reputation: 0,
+      categories: [],
+      cached: true,
+      permalink: null,
+    });
+    trustDomain("guthub.com", { source: "agent" });
+    const r = await runGate("https://guthub.com/login", base, offline);
+    expect(r.decision).toBe("block");
+    expect(r.authority.lookalikeOf).toBe("github.com");
+  });
+
   it("untrust restores review", async () => {
     trustDomain("x.example");
     untrustDomain("x.example");

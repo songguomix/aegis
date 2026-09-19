@@ -24,9 +24,13 @@ let custom: Record<string, OfficialEntry> = {};
 
 export function setCustomBrands(list: CustomBrand[] | undefined): void {
   custom = {};
+  const builtin = builtinMap();
   for (const b of list ?? []) {
     const host = normalizeHostname(b.host);
     if (!host || !b.brand) continue;
+    if (host.includes("/") || host.includes("://") || /\s/.test(host)) continue;
+    // Never override built-in official registry entries
+    if (builtin[host]) continue;
     custom[host] = {
       brand: b.brand,
       subject: b.subject || b.brand,
@@ -51,8 +55,9 @@ function builtinMap(): Record<string, OfficialEntry> {
   return loadOfficialMap();
 }
 
+/** Builtin wins; custom fills unknown hosts only. */
 function mergedMap(): Record<string, OfficialEntry> {
-  return { ...builtinMap(), ...custom };
+  return { ...custom, ...builtinMap() };
 }
 
 /** Official entry for hostname or a parent domain match. */

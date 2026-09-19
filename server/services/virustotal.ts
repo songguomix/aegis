@@ -18,7 +18,17 @@ const DISK_CACHE = path.join(DATA_DIR, "vt-cache.json");
 const memory = new Map<string, CacheEntry>();
 let lastCallAt = 0;
 let backoffUntil = 0;
-const MIN_INTERVAL_MS = 16000; // ~4/min free-tier safety
+let vtLock: Promise<void> = Promise.resolve();
+const MIN_INTERVAL_MS = 16000;
+
+async function withVtLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = vtLock.then(fn, fn);
+  vtLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+} // ~4/min free-tier safety
 
 function loadDisk(): void {
   try {
@@ -188,17 +198,19 @@ export function primeVtCache(domain: string, value: VirusTotalReport): void {
 }
 
 async function vtFetch(path: string, apiKey: string): Promise<Response> {
-  const now = Date.now();
-  if (now < backoffUntil) {
-    throw Object.assign(new Error("backoff"), { status: 429 });
-  }
-  const wait = MIN_INTERVAL_MS - (now - lastCallAt);
-  if (wait > 0) {
-    await new Promise((r) => setTimeout(r, wait));
-  }
-  lastCallAt = Date.now();
-  return fetch(`https://www.virustotal.com/api/v3${path}`, {
-    headers: { "x-apikey": apiKey, Accept: "application/json" },
+  return withVtLock(async () => {
+    const now = Date.now();
+    if (now < backoffUntil) {
+      throw Object.assign(new Error("backoff"), { status: 429 });
+    }
+    const wait = MIN_INTERVAL_MS - (now - lastCallAt);
+    if (wait > 0) {
+      await new Promise((r) => setTimeout(r, wait));
+    }
+    lastCallAt = Date.now();
+    return fetch(`https://www.virustotal.com/api/v3${path}`, {
+      headers: { "x-apikey": apiKey, Accept: "application/json" },
+    });
   });
 }
 

@@ -140,6 +140,7 @@ export default function App() {
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [sessionTrust, setSessionTrust] = useState<SessionTrustEntry[]>([]);
   const [customBrandsText, setCustomBrandsText] = useState("");
+  const [settingsDirty, setSettingsDirty] = useState(false);
   const [deployBundle, setDeployBundle] = useState<{
     mcpCommand: string;
     mcpEntry: string;
@@ -160,16 +161,18 @@ export default function App() {
       ]);
       setHealth(h);
       setHistory(hist.items);
-      setConfig(cfg);
-      setLang(cfg.language);
+      if (!settingsDirty) {
+        setConfig(cfg);
+        setLang(cfg.language);
+        setCustomBrandsText(
+          (cfg.customBrands ?? [])
+            .map((b) => `${b.host} | ${b.brand} | ${b.subject || ""}`)
+            .join("\n"),
+        );
+      }
       setIntegration(integ);
       setReviews(rev.items);
       setSessionTrust(trust.items);
-      setCustomBrandsText(
-        (cfg.customBrands ?? [])
-          .map((b) => `${b.host} | ${b.brand} | ${b.subject || ""}`)
-          .join("\n"),
-      );
       const bundle = await api.mcpDeployBundle().catch(() => null);
       if (bundle) {
         setDeployBundle({
@@ -181,7 +184,7 @@ export default function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [settingsDirty]);
 
   useEffect(() => {
     refresh();
@@ -287,7 +290,11 @@ export default function App() {
     alwaysAllow = false,
   ) {
     try {
-      await api.resolveReview(id, decision, { alwaysAllow, by: "user" });
+      await api.resolveReview(id, decision, {
+        alwaysAllow,
+        by: "user",
+        sessionTrust: decision === "allow",
+      });
       setToast(decision === "allow" ? "Allowed" : "Blocked");
       await refresh();
     } catch (e) {
@@ -456,7 +463,7 @@ export default function App() {
                           </button>
                           <button
                             className="btn btn-ghost deny-btn"
-                            onClick={() => resolvePending(r.id, "block", true)}
+                            onClick={() => resolvePending(r.id, "block", false)}
                           >
                             {L("deny")}
                           </button>
@@ -717,7 +724,7 @@ export default function App() {
                           <DecisionPill decision={item.decision} />
                         </td>
                         <td className="mono">{item.hostname}</td>
-                        <td>{item.virusTotal.status}</td>
+                        <td>{item.virusTotal?.status ?? "—"}</td>
                         <td>
                           <div className="score">{item.score}</div>
                         </td>
@@ -804,7 +811,7 @@ export default function App() {
                       </button>
                       <button
                         className="btn btn-ghost deny-btn"
-                        onClick={() => resolvePending(result.reviewId!, "block", true)}
+                        onClick={() => resolvePending(result.reviewId!, "block", false)}
                       >
                         {L("deny")}
                       </button>
@@ -827,7 +834,7 @@ export default function App() {
               <div className="actions">
                 <a
                   className="btn btn-ghost"
-                  href={`${(window as unknown as { aegis?: { getApiBase?: () => Promise<string> } }).aegis ? "" : "/api/v1"}/history/export?format=csv`}
+                  href="#"
                   onClick={(e) => {
                     e.preventDefault();
                     void apiBaseExport("csv");
@@ -884,8 +891,8 @@ export default function App() {
                           </td>
                           <td className="mono">{item.hostname}</td>
                           <td>{item.score}</td>
-                          <td>{item.virusTotal.status}</td>
-                          <td>{item.authority.brand ?? "—"}</td>
+                          <td>{item.virusTotal?.status ?? "—"}</td>
+                          <td>{item.authority?.brand ?? "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -917,6 +924,7 @@ export default function App() {
                       type="password"
                       placeholder={config.hasVtKey ? "••••••••" : "VT API key"}
                       onChange={(e) => {
+                        setSettingsDirty(true);
                         const v = e.target.value;
                         setConfig({ ...config, vtApiKey: v || null, hasVtKey: Boolean(v) });
                       }}
@@ -950,6 +958,7 @@ export default function App() {
                         value={config.language}
                         onChange={(e) => {
                           const language = e.target.value as Lang;
+                          setSettingsDirty(true);
                           setConfig({ ...config, language });
                           setLang(language);
                         }}
@@ -970,7 +979,7 @@ export default function App() {
                     <button
                       className={`switch ${config.enableRdap ? "on" : ""}`}
                       aria-label="RDAP"
-                      onClick={() => setConfig({ ...config, enableRdap: !config.enableRdap })}
+                      onClick={() => { setSettingsDirty(true); setConfig({ ...config, enableRdap: !config.enableRdap }); }}
                     />
                   </div>
 
@@ -984,19 +993,21 @@ export default function App() {
                     <button
                       className={`switch ${config.soundEnabled !== false ? "on" : ""}`}
                       aria-label="Sound"
-                      onClick={() =>
+                      onClick={() => {
+                        setSettingsDirty(true);
                         setConfig({
                           ...config,
                           soundEnabled: config.soundEnabled === false,
-                        })
-                      }
+                        });
+                      }}
                     />
                   </div>
 
                   <div className="form-actions">
                     <button
                       className="btn"
-                      onClick={() =>
+                      onClick={() => {
+                        setSettingsDirty(false);
                         saveSettings({
                           vtApiKey: config.vtApiKey,
                           policyMode: config.policyMode,
@@ -1018,8 +1029,8 @@ export default function App() {
                               };
                             })
                             .filter((b) => b.host && b.brand),
-                        })
-                      }
+                        });
+                      }}
                     >
                       {L("save")}
                     </button>

@@ -14,17 +14,8 @@ function isAllowedOrigin(origin: string): boolean {
   return LOCAL_ORIGIN.test(origin);
 }
 
-function isMutating(method: string, pathName = ""): boolean {
-  if (method === "PUT" || method === "DELETE" || method === "PATCH") return true;
-  // Security-control POSTs require local token when Origin is absent
-  if (method === "POST") {
-    return (
-      pathName.includes("/session-trust") ||
-      pathName.includes("/reviews/") ||
-      pathName.endsWith("/resolve")
-    );
-  }
-  return false;
+function isMutating(method: string, _pathName = ""): boolean {
+  return method === "PUT" || method === "DELETE" || method === "PATCH" || method === "POST";
 }
 
 export function createApp(): express.Express {
@@ -35,7 +26,6 @@ export function createApp(): express.Express {
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    // Browser pages: only echo local console/dev origins. Never *.
     if (origin && isAllowedOrigin(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
@@ -44,7 +34,6 @@ export function createApp(): express.Express {
     }
 
     if (req.method === "OPTIONS") {
-      // Preflight without allowed origin → 403 so browsers never send the real request.
       if (origin && !isAllowedOrigin(origin)) {
         res.sendStatus(403);
         return;
@@ -53,24 +42,20 @@ export function createApp(): express.Express {
       return;
     }
 
-    // Defense-in-depth for mutating routes: foreign browser origins are rejected
-    // even if a client bypasses preflight. Allowed local console origins may
-    // mutate; non-browser clients must present the local token.
-    if (isMutating(req.method, req.path || req.url || "")) {
+    // All mutating methods require local token (local CSRF defense).
+    if (isMutating(req.method)) {
       if (origin && !isAllowedOrigin(origin)) {
         res.status(403).json({ error: "forbidden_origin" });
         return;
       }
-      if (!origin) {
-        const token = req.header("x-aegis-token") ?? "";
-        const expected = getLocalToken();
-        if (!expected || token !== expected) {
-          res.status(401).json({
-            error: "unauthorized",
-            hint: "Send X-Aegis-Token from .aegis/token",
-          });
-          return;
-        }
+      const token = req.header("x-aegis-token") ?? "";
+      const expected = getLocalToken();
+      if (!expected || token !== expected) {
+        res.status(401).json({
+          error: "unauthorized",
+          hint: "Send X-Aegis-Token (console: GET /api/v1/session-token)",
+        });
+        return;
       }
     }
 

@@ -8,14 +8,25 @@ import {
 } from "./lookalike.js";
 import { fetchRdap } from "./rdap.js";
 
+export function listMatch(host: string, list: string[]): boolean {
+  const h = normalizeHostname(host);
+  return list.some((raw) => {
+    const d = normalizeHostname(raw);
+    if (!d || d.includes("://") || d.includes("/") || /\s/.test(d)) return false;
+    const labels = d.split(".");
+    if (labels.length < 2) return false; // reject "com", "example"
+    return h === d || h.endsWith(`.${d}`);
+  });
+}
+
 export async function buildAuthority(
   hostname: string,
   config: EngineConfig,
 ): Promise<{ report: AuthorityReport; reasons: Reason[] }> {
   const host = normalizeHostname(hostname);
   const official = lookupOfficial(host);
-  const allowlisted = config.allowlist.some((d) => host === normalizeHostname(d) || host.endsWith(`.${normalizeHostname(d)}`));
-  const denylisted = config.denylist.some((d) => host === normalizeHostname(d) || host.endsWith(`.${normalizeHostname(d)}`));
+  const allowlisted = listMatch(host, config.allowlist);
+  const denylisted = listMatch(host, config.denylist);
 
   const look = detectLookalike(host, officialHostnames());
   const puny = isPunycode(host);

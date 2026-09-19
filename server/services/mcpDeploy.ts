@@ -28,6 +28,18 @@ export interface ClientStatus {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function safeEntryOverride(entry?: string): string | null {
+  if (!entry) return null;
+  const raw = entry.trim();
+  if (!raw) return null;
+  if (/[$`"'\\\n\r;|&<>]/.test(raw)) return null;
+  const resolved = path.resolve(raw);
+  const root = path.resolve(__dirname, "..", "..");
+  if (!resolved.startsWith(root + path.sep) && resolved !== root) return null;
+  if (!fs.existsSync(resolved)) return null;
+  return resolved;
+}
+
 function resolveMcpEntry(): string {
   const __here = path.resolve(__dirname, "..", "..");
   const candidates = [
@@ -39,11 +51,15 @@ function resolveMcpEntry(): string {
   return candidates.find((p) => fs.existsSync(p)) ?? candidates[1];
 }
 
-function mcpServerEntry(entry: string): { command: string; args: string[] } {
+function mcpServerEntry(entry: string): { command: string; args: string[]; env?: Record<string, string> } {
   const isTs = entry.endsWith(".ts");
+  const dataDir =
+    process.env.AEGIS_DATA_DIR ??
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", ".aegis");
+  const env = { AEGIS_DATA_DIR: path.resolve(dataDir) };
   return isTs
-    ? { command: "npx", args: ["tsx", entry, "--mcp"] }
-    : { command: "node", args: [entry, "--mcp"] };
+    ? { command: "npx", args: ["tsx", entry, "--mcp"], env }
+    : { command: "node", args: [entry, "--mcp"], env };
 }
 
 function mcpConfigJson(entry: string): string {
@@ -108,11 +124,13 @@ function installSh(entry: string): string {
   const srv = mcpServerEntry(entry);
   const command = srv.command;
   const argsJson = JSON.stringify(srv.args);
+  const envDir = srv.env?.AEGIS_DATA_DIR ?? "";
   return `#!/usr/bin/env bash
 set -euo pipefail
-ENTRY="${entry}"
-COMMAND="${command}"
-ARGS_JSON='${argsJson}'
+ENTRY="${entry.replace(/"/g, "")}"
+COMMAND="${command.replace(/"/g, "")}"
+ARGS_JSON='${argsJson.replace(/'/g, "")}'
+AEGIS_DATA_DIR="${envDir.replace(/"/g, "")}"
 AEGIS_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 merge_one() {
@@ -128,6 +146,7 @@ merge_one() {
     const file = process.argv[1];
     const command = process.argv[2];
     const args = JSON.parse(process.argv[3]);
+    const dataDir = process.argv[4];
     const raw = fs.readFileSync(file, "utf8");
     let data;
     try { data = JSON.parse(raw); } catch (e) {
@@ -135,10 +154,12 @@ merge_one() {
       process.exit(2);
     }
     data.mcpServers = data.mcpServers || {};
-    data.mcpServers.aegis = { command: command, args: args };
+    const aegis = { command: command, args: args };
+    if (dataDir) aegis.env = { AEGIS_DATA_DIR: dataDir };
+    data.mcpServers.aegis = aegis;
     fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\\n");
     console.log("[ok] merged aegis into", file);
-  ' "$file" "$COMMAND" "$ARGS_JSON"
+  ' "$file" "$COMMAND" "$ARGS_JSON" "$AEGIS_DATA_DIR"
 }
 
 CLAUDE="\${CLAUDE_CONFIG:-$HOME/Library/Application Support/Claude/claude_desktop_config.json}"
@@ -153,7 +174,8 @@ echo "Bundle dir: $AEGIS_ROOT"
 }
 
 export function buildDeployBundle(entryOverride?: string): DeployBundle {
-  const entry = entryOverride && entryOverride.length > 0 ? entryOverride : resolveMcpEntry();
+  const safe = safeEntryOverride(entryOverride);
+  const entry = safe ?? resolveMcpEntry();
   const config = mcpConfigJson(entry);
   const files: DeployFile[] = [
     {

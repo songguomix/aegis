@@ -253,7 +253,6 @@ function decide(
     intelListed ||
     (authority.lookalikeOf !== null &&
       !authority.allowlisted &&
-      !sessionTrusted &&
       authority.official === false &&
       reasons.some((r) => r.code === "lookalike_domain" && r.severity === "critical"));
 
@@ -265,8 +264,8 @@ function decide(
 
   if (hardBlockSignals) return "block";
 
-  // Session trust: already human-approved this session — allow unless hard danger
-  if (sessionTrusted && !authority.denylisted) {
+  // Session trust: never overrides denylist/lookalike/malware (already excluded).
+  if (sessionTrusted && !authority.denylisted && !authority.lookalikeOf) {
     if (vtStatus === "clean" || vtStatus === "degraded" || vtStatus === "unknown") {
       return "allow";
     }

@@ -81,15 +81,24 @@ function resolveNodeBinary() {
 }
 
 function spawnServer(entry) {
+  const asarModules = app.isPackaged
+    ? path.join(process.resourcesPath, "app.asar", "node_modules")
+    : "";
+  const unpackedModules = app.isPackaged
+    ? path.join(process.resourcesPath, "app.asar.unpacked", "node_modules")
+    : "";
+  const nodePath = [asarModules, unpackedModules].filter(Boolean).join(path.delimiter);
   const env = {
     ...process.env,
     AEGIS_DATA_DIR: DATA_DIR,
+    ...(nodePath
+      ? { NODE_PATH: [nodePath, process.env.NODE_PATH].filter(Boolean).join(path.delimiter) }
+      : {}),
   };
   const node = resolveNodeBinary();
   if (node) {
     return spawn(node, [entry], { stdio: "inherit", env, cwd: ROOT });
   }
-  // Electron-as-Node: standard way to ship a Node server inside a packaged app.
   return spawn(process.execPath, [entry], {
     stdio: "inherit",
     env: { ...env, ELECTRON_RUN_AS_NODE: "1" },
@@ -224,6 +233,15 @@ function createWindow() {
 }
 
 ipcMain.handle("aegis:get-api-base", () => `http://127.0.0.1:${apiPort}/api/v1`);
+ipcMain.handle("aegis:get-token", () => {
+  try {
+    const p = path.join(DATA_DIR, "token");
+    if (fs.existsSync(p)) return fs.readFileSync(p, "utf8").trim();
+  } catch {
+    /* ignore */
+  }
+  return null;
+});
 let floatAnchor = null; // {x, y, width} — center-stable resize base
 let floatCompact = true;
 
@@ -293,19 +311,25 @@ app.whenReady().then(async () => {
   apiPort = await startCoreServer();
   createWindow();
   createFloatingWindow();
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-      createFloatingWindow();
-    }
-  });
 });
 
 app.on("window-all-closed", () => {
-  if (serverProc) serverProc.kill();
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin") {
+    if (serverProc) serverProc.kill();
+    app.quit();
+  }
 });
 
 app.on("before-quit", () => {
   if (serverProc) serverProc.kill();
+});
+
+app.on("activate", async () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    if (!serverProc || serverProc.killed) {
+      apiPort = await startCoreServer();
+    }
+    createWindow();
+    createFloatingWindow();
+  }
 });

@@ -36,6 +36,21 @@ describe("mcp deploy bundle", () => {
     expect(sh).toContain('"tsx"');
   });
 
+  it("rejects shell-metachar entry override", () => {
+    const bad = buildDeployBundle("/tmp/evil$(id)/index.js");
+    expect(bad.mcpEntry).not.toContain("$(");
+    const sh = bad.files.find((f) => f.filename === "install.sh")!.content;
+    expect(sh).not.toContain("$(");
+  });
+
+  it("includes AEGIS_DATA_DIR in mcp config", () => {
+    const b = buildDeployBundle("/tmp/fake/dist-server/index.js");
+    const json = JSON.parse(
+      b.files.find((f) => f.filename === "mcp.claude.json")!.content,
+    ) as { mcpServers: { aegis: { env?: Record<string, string> } } };
+    expect(json.mcpServers.aegis.env?.AEGIS_DATA_DIR).toBeTruthy();
+  });
+
   it("zip has PK header and file entries", () => {
     const b = buildDeployBundle("/tmp/fake/dist-server/index.js");
     const zip = buildDeployZip(b);

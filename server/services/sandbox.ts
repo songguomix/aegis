@@ -253,6 +253,8 @@ export async function extractInSandbox(
   const sandboxRoot = makeSandboxRoot();
   const dest = path.join(sandboxRoot, "extract");
   fs.mkdirSync(dest, { recursive: true, mode: 0o700 });
+  const localZip = path.join(sandboxRoot, "input.bin");
+  fs.copyFileSync(abs, localZip);
 
   // Path traversal check on names first (defensive)
   const members: string[] = [];
@@ -302,8 +304,8 @@ with zipfile.ZipFile(src) as z:
 print(len(z.namelist()))
 `;
   const result = await runInSandbox(
-    ["/usr/bin/python3", "-c", script, abs, dest],
-    { timeoutMs: opts.timeoutMs ?? 8000 },
+    ["/usr/bin/python3", "-c", script, localZip, dest],
+    { timeoutMs: opts.timeoutMs ?? 8000, cwd: sandboxRoot },
   );
 
   return {

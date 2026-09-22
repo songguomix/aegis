@@ -25,7 +25,7 @@ export const AGENT_GUARD_POLICY = {
     },
     {
       id: "files",
-      text: "After downloading a file: if size ≤ Aegis maxUploadBytes (default 32MB), call upload_scan_file (path or base64) and wait for allow. Otherwise call check_file_hash. block → quarantine/delete, do not run.",
+      text: "After downloading a file: if size ≤ Aegis maxUploadBytes (default 32MB), call upload_scan_file (path or base64) and wait for allow. Otherwise call check_file_hash. block → quarantine/delete, do not run. If scan is review or block, call analyze_installer(path) and use aiBrief for your analysis and user recommendation before any install.",
     },
     {
       id: "custom_brands",

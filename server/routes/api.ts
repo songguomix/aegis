@@ -6,6 +6,7 @@ import { z } from "zod";
 import { runGate, parseUrl } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
 import { scanDownloadedFile } from "../services/fileUploadScan.js";
+import { analyzeInstallerPath } from "../services/installerProbe.js";
 import { runUploadScan } from "../services/uploadScan.js";
 import {
   appendHistory,
@@ -442,6 +443,25 @@ export function createApiRouter(): express.Router {
   });
 
   /** Small-file VirusTotal upload scan for agent downloads. */
+  router.post("/analyze-installer", (req, res) => {
+    const parsed = z
+      .object({
+        path: z.string().min(1),
+        context: z.string().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const analysis = analyzeInstallerPath(parsed.data.path);
+    if (!analysis.ok && (analysis.error === "file_not_found" || analysis.error === "not_a_file")) {
+      res.status(404).json(analysis);
+      return;
+    }
+    res.json(analysis);
+  });
+
   router.post("/scan-file", async (req, res) => {
     const parsed = z
       .object({

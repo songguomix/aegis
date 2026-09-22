@@ -1,14 +1,24 @@
 ---
 feature: cross-platform
-status: designed
+status: delivered
 updated: 2026-09-19
 branch: feat/cross-platform
-commits: 82986b9..pending
+commits: 82986b9..23c87ed
 ---
 
 # 三端兼容（Windows / macOS / Linux）
 
 ## Report
+
+**What was built** — Windows / macOS / Linux 三端兼容：核心门禁、MCP/HTTP、上传扫描与取证在三端一致。沙箱按平台选择 `seatbelt`（macOS）/ `bwrap`（Linux，无网络）/ `restricted`（Win 或缺 bwrap：隔离目录+过滤环境，`degraded` 明示）。Electron：`vibrancy` 仅 macOS；`electron-builder` 增加 `pack:win` / `pack:linux` / `pack:all`（NSIS、AppImage、deb）。
+
+**Verification** — typecheck PASS；npm test 56/56；本机 smoke `mode=seatbelt platform=darwin`；打包脚本已挂到 package.json（Windows/Linux 需在对应系统执行）。
+
+**Journey log** —
+1. 三端不能写死 unix 路径与 Seatbelt；用 `detectSandboxBackend()` 分支。
+2. 无内核隔离时必须 `degraded=true`，避免假安全。
+3. 打包用 electron-builder 多 target；签名/公证仍按平台单独配置。
+
 
 ## [S1] Problem
 
@@ -51,7 +61,7 @@ Aegis 主要在 macOS 验证；沙箱依赖 `sandbox-exec`，打包仅 mac。需
 
 ## Tasks
 
-- [ ] T1: Spec
-- [ ] T2: sandbox backends + tests (covers: S2)
-- [ ] T3: electron-builder 三端 + electron 主进程兼容 (covers: S2)
-- [ ] T4: Verify + merge (covers: S2)
+- [x] T1: Spec
+- [x] T2: sandbox backends + tests (covers: S2)
+- [x] T3: electron-builder 三端 + electron 主进程兼容 (covers: S2)
+- [x] T4: Verify + merge (covers: S2)

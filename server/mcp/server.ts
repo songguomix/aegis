@@ -5,6 +5,7 @@ import { runGate } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
 import { scanDownloadedFile } from "../services/fileUploadScan.js";
 import { analyzeInstallerPath } from "../services/installerProbe.js";
+import { runInSandbox, extractInSandbox, cleanupSandbox } from "../services/sandbox.js";
 import { runUploadScan } from "../services/uploadScan.js";
 import { getConfig, appendHistory, stats, updateConfig } from "../services/store.js";
 import { lookupOfficial } from "../services/registry.js";
@@ -246,6 +247,46 @@ export function createMcpServer(): McpServer {
       const bundle = buildDeployBundle();
       return {
         content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "run_in_sandbox",
+    {
+      title: "Run command in strict sandbox (no network)",
+      description:
+        "Run an argv command in a hardened sandbox (macOS Seatbelt when available): deny network, write only sandbox temp, filter secrets from env. Use for static inspection of unpacked installers (file, ls, strings). Do NOT use to install or execute untrusted payloads on the real user system.",
+      inputSchema: {
+        argv: z.array(z.string()).min(1).max(32),
+        timeoutMs: z.number().int().min(500).max(60000).optional(),
+      },
+    },
+    async ({ argv, timeoutMs }) => {
+      const result = await runInSandbox(argv, { timeoutMs });
+      cleanupSandbox(result.sandboxRoot);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        isError: !result.ok,
+      };
+    },
+  );
+
+  server.registerTool(
+    "extract_in_sandbox",
+    {
+      title: "Extract zip into sandbox (traversal-safe)",
+      description:
+        "Unpack a zip/jar/apk into a sandbox directory with path-traversal checks. Returns member names and risky executables for analyze_installer follow-up.",
+      inputSchema: {
+        path: z.string().describe("Absolute path to zip archive"),
+      },
+    },
+    async ({ path: archive }) => {
+      const result = await extractInSandbox(archive);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        isError: !result.ok,
       };
     },
   );

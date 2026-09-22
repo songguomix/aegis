@@ -7,6 +7,7 @@ import { runGate, parseUrl } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
 import { scanDownloadedFile } from "../services/fileUploadScan.js";
 import { analyzeInstallerPath } from "../services/installerProbe.js";
+import { runInSandbox, extractInSandbox, cleanupSandbox } from "../services/sandbox.js";
 import { runUploadScan } from "../services/uploadScan.js";
 import {
   appendHistory,
@@ -443,6 +444,45 @@ export function createApiRouter(): express.Router {
   });
 
   /** Small-file VirusTotal upload scan for agent downloads. */
+  /** Strict sandbox: run argv only (no shell), deny network, write only sandbox root. */
+  router.post("/sandbox/run", async (req, res) => {
+    const parsed = z
+      .object({
+        argv: z.array(z.string().min(1)).min(1).max(32),
+        timeoutMs: z.number().int().min(500).max(60000).optional(),
+        cleanup: z.boolean().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const result = await runInSandbox(parsed.data.argv, {
+      timeoutMs: parsed.data.timeoutMs,
+    });
+    if (parsed.data.cleanup !== false) {
+      cleanupSandbox(result.sandboxRoot);
+    }
+    res.json(result);
+  });
+
+  router.post("/sandbox/extract", async (req, res) => {
+    const parsed = z
+      .object({
+        path: z.string().min(1),
+        timeoutMs: z.number().int().min(500).max(60000).optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const result = await extractInSandbox(parsed.data.path, {
+      timeoutMs: parsed.data.timeoutMs,
+    });
+    res.json(result);
+  });
+
   router.post("/analyze-installer", (req, res) => {
     const parsed = z
       .object({

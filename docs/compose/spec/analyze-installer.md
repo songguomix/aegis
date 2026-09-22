@@ -1,14 +1,24 @@
 ---
 feature: analyze-installer
-status: designed
+status: delivered
 updated: 2026-09-19
 branch: feat/analyze-installer
-commits: 4a178b0..pending
+commits: 4a178b0..43693c5
 ---
 
 # 有问题时让 AI 分析安装包
 
 ## Report
+
+**What was built** — 扫描结果为 review/block 时，MCP `analyze_installer` 与 `POST /api/v1/analyze-installer` 对本地安装包做**只读静态取证**（哈希、类型魔数、熵、嵌入 URL/IP、可疑字符串、压缩包成员、riskFlags），并生成 `aiBrief` 分析提纲回传 AI，由 Agent 总结风险并建议用户放行/隔离/删除。不执行文件。
+
+**Verification** — typecheck PASS；npm test 51/51；HTTP/MCP 实测返回 pe-exe、riskFlags、aiBrief。
+
+**Journey log** —
+1. 疑似安装包优先静态线索（类型/字符串/熵），避免沙箱复杂度。
+2. `aiBrief` 明确分析任务列表，便于 LLM 输出可执行建议。
+3. zip 本地头扫描即可列成员名，无需完整解压。
+
 
 ## [S1] Problem
 
@@ -44,7 +54,7 @@ Agent Guard：`scan_*` 得 review/block 后调用 `analyze_installer`，把 `aiB
 
 ## Tasks
 
-- [ ] T1: Spec
-- [ ] T2: installerProbe 服务 + HTTP/MCP (covers: S2)
-- [ ] T3: 测试 + Agent Guard 文案 (covers: S2)
-- [ ] T4: Verify + merge (covers: S2)
+- [x] T1: Spec
+- [x] T2: installerProbe 服务 + HTTP/MCP (covers: S2)
+- [x] T3: 测试 + Agent Guard 文案 (covers: S2)
+- [x] T4: Verify + merge (covers: S2)

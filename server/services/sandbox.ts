@@ -4,10 +4,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 
+export type SandboxMode = "seatbelt" | "bwrap" | "restricted";
+
 export interface SandboxRunResult {
   ok: boolean;
   degraded: boolean;
-  mode: "seatbelt" | "fallback";
+  mode: SandboxMode;
+  platform: NodeJS.Platform;
   sandboxRoot: string;
   argv: string[];
   exitCode: number | null;
@@ -21,7 +24,8 @@ export interface SandboxRunResult {
 export interface SandboxExtractResult {
   ok: boolean;
   degraded: boolean;
-  mode: "seatbelt" | "fallback";
+  mode: SandboxMode;
+  platform: NodeJS.Platform;
   sandboxRoot: string;
   members: string[];
   riskyMembers: string[];
@@ -32,12 +36,25 @@ export interface SandboxExtractResult {
 const MAX_OUTPUT = 64 * 1024;
 const DEFAULT_TIMEOUT_MS = 5000;
 
-function hasSandboxExec(): boolean {
-  try {
-    return fs.existsSync("/usr/bin/sandbox-exec");
-  } catch {
-    return false;
+export function detectSandboxBackend(): SandboxMode {
+  if (process.platform === "darwin" && fs.existsSync("/usr/bin/sandbox-exec")) {
+    return "seatbelt";
   }
+  for (const p of ["/usr/bin/bwrap", "/bin/bwrap"]) {
+    if (fs.existsSync(p)) return "bwrap";
+  }
+  return "restricted";
+}
+
+function hasSandboxExec(): boolean {
+  return detectSandboxBackend() === "seatbelt";
+}
+
+function findBwrap(): string | null {
+  for (const p of ["/usr/bin/bwrap", "/bin/bwrap"]) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
 }
 
 function makeSandboxRoot(): string {
@@ -147,7 +164,8 @@ export async function runInSandbox(
     return {
       ok: false,
       degraded: true,
-      mode: "fallback",
+      mode: "restricted",
+      platform: process.platform,
       sandboxRoot,
       argv: [],
       exitCode: null,
@@ -159,14 +177,49 @@ export async function runInSandbox(
     };
   }
 
-  const seatbelt = hasSandboxExec();
+  const backend = detectSandboxBackend();
   const profilePath = path.join(sandboxRoot, ".aegis.sb");
-  if (seatbelt) {
+  if (backend === "seatbelt") {
     fs.writeFileSync(profilePath, buildSeatbeltProfile(sandboxRoot), "utf8");
   }
 
-  const cmd = seatbelt ? "/usr/bin/sandbox-exec" : argv[0];
-  const args = seatbelt ? ["-f", profilePath, ...argv] : argv.slice(1);
+  let cmd: string;
+  let args: string[];
+  if (backend === "seatbelt") {
+    cmd = "/usr/bin/sandbox-exec";
+    args = ["-f", profilePath, ...argv];
+  } else if (backend === "bwrap") {
+    const bwrap = findBwrap()!;
+    cmd = bwrap;
+    args = [
+      "--unshare-all",
+      "--unshare-net",
+      "--die-with-parent",
+      "--ro-bind",
+      "/usr",
+      "/usr",
+      "--ro-bind",
+      "/bin",
+      "/bin",
+      "--ro-bind",
+      "/lib",
+      "/lib",
+      "--ro-bind",
+      "/lib64",
+      "/lib64",
+      "--proc",
+      "/proc",
+      "--dev",
+      "/dev",
+      "--bind",
+      sandboxRoot,
+      sandboxRoot,
+      ...argv,
+    ];
+  } else {
+    cmd = argv[0];
+    args = argv.slice(1);
+  }
 
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
@@ -203,8 +256,9 @@ export async function runInSandbox(
       clearTimeout(timer);
       resolve({
         ok: false,
-        degraded: !seatbelt,
-        mode: seatbelt ? "seatbelt" : "fallback",
+        degraded: backend === "restricted",
+        mode: backend,
+        platform: process.platform,
         sandboxRoot,
         argv,
         exitCode: null,
@@ -222,8 +276,9 @@ export async function runInSandbox(
       const e = truncate(stderr);
       resolve({
         ok: code === 0,
-        degraded: !seatbelt,
-        mode: seatbelt ? "seatbelt" : "fallback",
+        degraded: backend === "restricted",
+        mode: backend,
+        platform: process.platform,
         sandboxRoot,
         argv,
         exitCode: code,
@@ -246,7 +301,8 @@ export async function extractInSandbox(
     return {
       ok: false,
       degraded: true,
-      mode: "fallback",
+      mode: "restricted",
+      platform: process.platform,
       sandboxRoot: "",
       members: [],
       riskyMembers: [],
@@ -269,7 +325,8 @@ export async function extractInSandbox(
             return {
               ok: false,
               degraded: false,
-              mode: "fallback" as const,
+              mode: "restricted" as const,
+              platform: process.platform,
               sandboxRoot: "",
               members,
               riskyMembers: risky,
@@ -319,14 +376,14 @@ export async function extractInSandbox(
       result = {
         ...result,
         ok: extractedCount > 0,
-        mode: "fallback",
+        mode: "restricted",
         degraded: true,
       };
     } catch (e) {
       result = {
         ...result,
         ok: false,
-        mode: "fallback",
+        mode: "restricted",
         degraded: true,
         stderr: e instanceof Error ? e.message : result.stderr,
       };
@@ -337,6 +394,7 @@ export async function extractInSandbox(
     ok: result.ok || extractedCount > 0,
     degraded: result.degraded,
     mode: result.mode,
+    platform: process.platform,
     sandboxRoot: dest,
     members,
     riskyMembers: risky,

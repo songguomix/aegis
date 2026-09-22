@@ -29,7 +29,7 @@ describe("security sandbox", () => {
     roots.push(r.sandboxRoot);
     expect(r.stdout).toContain("aegis-ok");
     expect(r.exitCode).toBe(0);
-    expect(["seatbelt", "fallback"]).toContain(r.mode);
+    expect(["seatbelt", "bwrap", "restricted"]).toContain(r.mode);
     // env should not leak secrets even if present
     const r2 = await runInSandbox(["/usr/bin/env"]);
     roots.push(r2.sandboxRoot);

@@ -18,6 +18,9 @@
     "build:server": "tsc -p tsconfig.server.json && node scripts/copy-server-assets.mjs",
     "start": "electron .",
     "pack:app": "npm run build && electron-builder --mac --config electron-builder.yml",
+    "pack:win": "npm run build && electron-builder --win --config electron-builder.yml",
+    "pack:linux": "npm run build && electron-builder --linux --config electron-builder.yml",
+    "pack:all": "npm run build && electron-builder -mwl --config electron-builder.yml",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit"
   },

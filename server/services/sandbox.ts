@@ -91,14 +91,14 @@ export function buildSeatbeltProfile(sandboxRoot: string): string {
   (subpath "/tmp/aegis-sandbox")
   (literal "${abs}")
 )
-(allow process-exec (literal "/bin/rm") (literal "/usr/bin/unzip") (literal "/usr/bin/python3") (literal "/usr/bin/env"))
+(allow process-exec*)
 (allow process-fork)
+(allow process-info*)
 (deny network*)
 (deny network-outbound)
 (deny network-inbound)
-(deny ipc-*)
+(deny ipc*)
 (allow sysctl-read)
-(allow mach-lookup (global-name "com.apple.system.logger"))
 `.trim();
 }
 

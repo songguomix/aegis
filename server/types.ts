@@ -148,7 +148,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   allowlist: [],
   denylist: [],
   vtCacheTtlMs: 6 * 60 * 60 * 1000,
-  rdapTimeoutMs: 3000,
+  rdapTimeoutMs: 1500,
   httpPort: 7832,
   soundEnabled: true,
   maxUploadBytes: 32 * 1024 * 1024,

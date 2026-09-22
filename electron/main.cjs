@@ -40,12 +40,12 @@ function deletePortFile() {
   }
 }
 
-function waitForHealth(port, timeoutMs = 12000) {
+function waitForHealth(port, timeoutMs = 2500) {
   return new Promise((resolve) => {
     const start = Date.now();
     const tick = () => {
       const req = http.get(
-        { host: "127.0.0.1", port, path: "/api/v1/health", timeout: 1000 },
+        { host: "127.0.0.1", port, path: "/api/v1/health", timeout: 400 },
         (res) => {
           res.resume();
           resolve(res.statusCode === 200);
@@ -53,12 +53,12 @@ function waitForHealth(port, timeoutMs = 12000) {
       );
       req.on("error", () => {
         if (Date.now() - start > timeoutMs) resolve(false);
-        else setTimeout(tick, 200);
+        else setTimeout(tick, 60);
       });
       req.on("timeout", () => {
         req.destroy();
         if (Date.now() - start > timeoutMs) resolve(false);
-        else setTimeout(tick, 200);
+        else setTimeout(tick, 60);
       });
     };
     tick();
@@ -125,13 +125,13 @@ async function startCoreServer() {
   }
 
   const start = Date.now();
-  while (Date.now() - start < 12000) {
+  while (Date.now() - start < 2500) {
     const p = readPortFile();
     if (p) {
-      const ok = await waitForHealth(p, 4000);
+      const ok = await waitForHealth(p, 800);
       if (ok) return p;
     }
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 50));
   }
   return 7832;
 }
@@ -217,8 +217,8 @@ function createWindow() {
     try {
       await mainWindow.loadURL(target);
     } catch (err) {
-      if (attempt < 8) {
-        await new Promise((r) => setTimeout(r, 400));
+      if (attempt < 12) {
+        await new Promise((r) => setTimeout(r, 50));
         return load(attempt + 1);
       }
       console.error("[aegis-electron] failed to load", target, err);
@@ -308,9 +308,11 @@ ipcMain.on("aegis:float-size", (_e, compact) => {
 });
 
 app.whenReady().then(async () => {
-  apiPort = await startCoreServer();
   createWindow();
   createFloatingWindow();
+  startCoreServer().then((p) => {
+    apiPort = p;
+  });
 });
 
 app.on("window-all-closed", () => {

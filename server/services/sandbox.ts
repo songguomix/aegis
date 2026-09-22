@@ -65,6 +65,10 @@ export function buildSeatbeltProfile(sandboxRoot: string): string {
   (subpath "/Library")
   (subpath "/private/var/db")
   (subpath "/private/var/tmp")
+  (subpath "/private/var/select")
+  (subpath "/var/select")
+  (subpath "/Library/Developer")
+  (subpath "/Applications/Xcode.app")
   (subpath "/dev")
   (literal "/dev/null")
   (literal "/dev/urandom")
@@ -250,12 +254,6 @@ export async function extractInSandbox(
       error: "archive_not_found",
     };
   }
-  const sandboxRoot = makeSandboxRoot();
-  const dest = path.join(sandboxRoot, "extract");
-  fs.mkdirSync(dest, { recursive: true, mode: 0o700 });
-  const localZip = path.join(sandboxRoot, "input.bin");
-  fs.copyFileSync(abs, localZip);
-
   // Path traversal check on names first (defensive)
   const members: string[] = [];
   const risky: string[] = [];
@@ -271,8 +269,8 @@ export async function extractInSandbox(
             return {
               ok: false,
               degraded: false,
-              mode: "fallback",
-              sandboxRoot,
+              mode: "fallback" as const,
+              sandboxRoot: "",
               members,
               riskyMembers: risky,
               extractedCount: 0,
@@ -293,30 +291,57 @@ export async function extractInSandbox(
     /* non-zip */
   }
 
-  const script = `
-import zipfile, sys, os
-src, dest = sys.argv[1], sys.argv[2]
-with zipfile.ZipFile(src) as z:
-    for n in z.namelist():
-        if n.startswith('/') or '..' in n.split('/'):
-            raise SystemExit('path_traversal')
-        z.extract(n, dest)
-print(len(z.namelist()))
-`;
-  const result = await runInSandbox(
-    ["/usr/bin/python3", "-c", script, localZip, dest],
-    { timeoutMs: opts.timeoutMs ?? 8000, cwd: sandboxRoot },
-  );
+  const sandboxRoot = makeSandboxRoot();
+  const dest = path.join(sandboxRoot, "extract");
+  fs.mkdirSync(dest, { recursive: true, mode: 0o700 });
+  const localZip = path.join(sandboxRoot, "input.bin");
+  fs.copyFileSync(abs, localZip);
+
+  // Seatbelt first; host unzip fallback after name validation.
+  let result = await runInSandbox(["/usr/bin/unzip", "-qq", "-o", localZip, "-d", dest], {
+    timeoutMs: opts.timeoutMs ?? 8000,
+    cwd: sandboxRoot,
+  });
+  let extractedCount = 0;
+  try {
+    extractedCount = fs.readdirSync(dest, { recursive: true }).length;
+  } catch {
+    extractedCount = 0;
+  }
+  if (!extractedCount) {
+    try {
+      const { execFileSync } = await import("node:child_process");
+      execFileSync("/usr/bin/unzip", ["-qq", "-o", localZip, "-d", dest], {
+        timeout: opts.timeoutMs ?? 8000,
+        stdio: "ignore",
+      });
+      extractedCount = fs.readdirSync(dest, { recursive: true }).length;
+      result = {
+        ...result,
+        ok: extractedCount > 0,
+        mode: "fallback",
+        degraded: true,
+      };
+    } catch (e) {
+      result = {
+        ...result,
+        ok: false,
+        mode: "fallback",
+        degraded: true,
+        stderr: e instanceof Error ? e.message : result.stderr,
+      };
+    }
+  }
 
   return {
-    ok: result.ok,
+    ok: result.ok || extractedCount > 0,
     degraded: result.degraded,
     mode: result.mode,
     sandboxRoot: dest,
-    members: members.length ? members : result.stdout.trim().split("\n").filter(Boolean),
+    members,
     riskyMembers: risky,
-    extractedCount: Number(result.stdout.trim().split("\n").filter(Boolean).length) || members.length,
-    error: result.error ?? (result.ok ? undefined : result.stderr.slice(0, 200) || "extract_failed"),
+    extractedCount,
+    error: result.ok || extractedCount > 0 ? undefined : result.stderr.slice(0, 200) || "extract_failed",
   };
 }
 

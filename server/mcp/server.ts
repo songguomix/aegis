@@ -4,6 +4,7 @@ import { z } from "zod";
 import { runGate } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
 import { scanDownloadedFile } from "../services/fileUploadScan.js";
+import { analyzeInstallerPath } from "../services/installerProbe.js";
 import { runUploadScan } from "../services/uploadScan.js";
 import { getConfig, appendHistory, stats, updateConfig } from "../services/store.js";
 import { lookupOfficial } from "../services/registry.js";
@@ -245,6 +246,25 @@ export function createMcpServer(): McpServer {
       const bundle = buildDeployBundle();
       return {
         content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "analyze_installer",
+    {
+      title: "Static analysis of a suspicious installer/package",
+      description:
+        "When scan_downloaded_file / upload_scan_file returns review or block, analyze the local installer (dmg/pkg/exe/zip/…) WITHOUT executing it. Returns hashes, type, entropy, embedded URLs/strings, archive names, riskFlags and aiBrief for you to analyze and recommend user action.",
+      inputSchema: {
+        path: z.string().describe("Absolute path to installer/package"),
+      },
+    },
+    async ({ path: p }) => {
+      const analysis = analyzeInstallerPath(p);
+      return {
+        content: [{ type: "text", text: JSON.stringify(analysis, null, 2) }],
+        isError: !analysis.ok,
       };
     },
   );

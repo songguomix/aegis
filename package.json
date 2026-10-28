@@ -1,9 +1,12 @@
 {
   "name": "aegis",
   "productName": "Aegis",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Truth before trust — network security gateway for AI agents",
-  "author": "Aegis",
+  "author": {
+    "name": "songguomix",
+    "email": "songguomix@users.noreply.github.com"
+  },
   "license": "MIT",
   "main": "electron/main.cjs",
   "private": true,

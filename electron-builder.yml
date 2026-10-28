@@ -58,13 +58,14 @@
   },
   "linux": {
     "category": "Utility",
+    "maintainer": "songguomix <songguomix@users.noreply.github.com>",
     "target": [
       {
         "target": "AppImage",
         "arch": ["x64"]
       },
       {
-        "target": "deb",
+        "target": "tar.gz",
         "arch": ["x64"]
       }
     ]

@@ -107,6 +107,12 @@ function spawnServer(entry) {
 }
 
 async function startCoreServer() {
+  const existingPort = readPortFile() ?? 7832;
+  const alreadyHealthy = await waitForHealth(existingPort, 500);
+  if (alreadyHealthy) {
+    return existingPort;
+  }
+
   deletePortFile();
   const distEntry = path.join(ROOT, "dist-server", "index.js");
   const tsx = path.join(ROOT, "node_modules", ".bin", "tsx");
@@ -124,16 +130,27 @@ async function startCoreServer() {
     return 7832;
   }
 
-  const start = Date.now();
-  while (Date.now() - start < 2500) {
-    const p = readPortFile();
-    if (p) {
-      const ok = await waitForHealth(p, 800);
-      if (ok) return p;
-    }
-    await new Promise((r) => setTimeout(r, 50));
+  // The core server writes the port file right after it binds. Wait for that
+  // file (not a fixed delay) so we never guess a wrong port: the app may be
+  // running next to another instance that already holds 7832.
+  const bindDeadline = Date.now() + 15000;
+  let port = null;
+  while (Date.now() < bindDeadline) {
+    port = readPortFile();
+    if (port) break;
+    if (serverProc && serverProc.exitCode !== null) break; // server died
+    await new Promise((r) => setTimeout(r, 40));
   }
-  return 7832;
+  if (!port) return 7832;
+
+  const healthDeadline = Date.now() + 10000;
+  while (Date.now() < healthDeadline) {
+    const ok = await waitForHealth(port, 800);
+    if (ok) return port;
+    if (serverProc && serverProc.exitCode !== null) break;
+  }
+  // Health never came up: the port file is still the best information we have.
+  return port;
 }
 
 function createFloatingWindow() {
@@ -162,17 +179,12 @@ function createFloatingWindow() {
       preload: path.join(__dirname, "floating-preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      additionalArguments: [`--aegis-api-port=${apiPort}`],
     },
   });
 
   floatingWindow.setAlwaysOnTop(true, "screen-saver");
   floatingWindow.setVisibleOnAllWorkspaces(true, {
     visibleOnFullScreen: true,
-  });
-
-  floatingWindow.loadFile(path.join(__dirname, "floating.html"), {
-    query: { port: String(apiPort) },
   });
 
   floatingWindow.once("ready-to-show", () => {
@@ -192,23 +204,41 @@ function createFloatingWindow() {
   });
 }
 
+/** Load the floating UI once the core server port is known. */
+function loadFloatingUi() {
+  if (!floatingWindow || floatingWindow.isDestroyed()) return;
+  floatingWindow.loadFile(path.join(__dirname, "floating.html"), {
+    query: { port: String(apiPort) },
+  });
+}
+
 function createWindow() {
+  const iconPath = path.join(ROOT, "build", "icon.png");
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 960,
     minHeight: 640,
     title: "Aegis",
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     backgroundColor: "#fafafa",
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      additionalArguments: [`--aegis-api-port=${apiPort}`],
     },
   });
 
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+}
+
+/** Load the main UI once the core server port is known. */
+async function loadMainUi() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   const target = isDev
     ? process.env.VITE_DEV_SERVER_URL
     : `http://127.0.0.1:${apiPort}/`;
@@ -224,12 +254,7 @@ function createWindow() {
       console.error("[aegis-electron] failed to load", target, err);
     }
   };
-  load();
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
+  await load();
 }
 
 ipcMain.handle("aegis:get-api-base", () => `http://127.0.0.1:${apiPort}/api/v1`);
@@ -308,11 +333,14 @@ ipcMain.on("aegis:float-size", (_e, compact) => {
 });
 
 app.whenReady().then(async () => {
+  // Windows are created immediately (fast boot), but their content is loaded
+  // only after the core server bound its port — otherwise the UI would point
+  // at a stale/foreign port (7832 may already be taken by another instance).
   createWindow();
   createFloatingWindow();
-  startCoreServer().then((p) => {
-    apiPort = p;
-  });
+  apiPort = await startCoreServer();
+  await loadMainUi();
+  loadFloatingUi();
 });
 
 app.on("window-all-closed", () => {
@@ -333,5 +361,7 @@ app.on("activate", async () => {
     }
     createWindow();
     createFloatingWindow();
+    await loadMainUi();
+    loadFloatingUi();
   }
 });

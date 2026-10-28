@@ -105,6 +105,33 @@ function zipMemberNames(sample: Buffer): string[] {
   return names;
 }
 
+/** Hash a file in fixed-size chunks so huge installers never land in memory. */
+function hashFileSync(
+  fd: number,
+  size: number,
+): { sha256: string; sha1: string; md5: string } {
+  const sha256 = crypto.createHash("sha256");
+  const sha1 = crypto.createHash("sha1");
+  const md5 = crypto.createHash("md5");
+  const chunk = Buffer.alloc(Math.min(1024 * 1024, Math.max(size, 1)));
+  let offset = 0;
+  while (offset < size) {
+    const want = Math.min(chunk.length, size - offset);
+    const read = fs.readSync(fd, chunk, 0, want, offset);
+    if (read <= 0) break;
+    const slice = chunk.subarray(0, read);
+    sha256.update(slice);
+    sha1.update(slice);
+    md5.update(slice);
+    offset += read;
+  }
+  return {
+    sha256: sha256.digest("hex"),
+    sha1: sha1.digest("hex"),
+    md5: md5.digest("hex"),
+  };
+}
+
 export function analyzeInstallerPath(absPath: string): InstallerAnalysis {
   const checkedAt = new Date().toISOString();
   let resolved = "";
@@ -160,23 +187,14 @@ export function analyzeInstallerPath(absPath: string): InstallerAnalysis {
     const sample = Buffer.alloc(sampleLen);
     fs.readSync(fd, sample, 0, sampleLen, 0);
 
-    const hashes = {
-      sha256: crypto.createHash("sha256").update(sample).digest("hex"),
-      sha1: "",
-      md5: "",
-    };
-    // full-file hashes when file is small enough we already have full content
-    if (st.size <= MAX_SAMPLE) {
-      hashes.sha256 = crypto.createHash("sha256").update(sample).digest("hex");
-      hashes.sha1 = crypto.createHash("sha1").update(sample).digest("hex");
-      hashes.md5 = crypto.createHash("md5").update(sample).digest("hex");
-    } else {
-      // stream full hashes
-      const buf = fs.readFileSync(resolved);
-      hashes.sha256 = crypto.createHash("sha256").update(buf).digest("hex");
-      hashes.sha1 = crypto.createHash("sha1").update(buf).digest("hex");
-      hashes.md5 = crypto.createHash("md5").update(buf).digest("hex");
-    }
+    const hashes =
+      st.size <= MAX_SAMPLE
+        ? {
+            sha256: crypto.createHash("sha256").update(sample).digest("hex"),
+            sha1: crypto.createHash("sha1").update(sample).digest("hex"),
+            md5: crypto.createHash("md5").update(sample).digest("hex"),
+          }
+        : hashFileSync(fd, st.size);
 
     const kindInfo = detectKind(head, resolved);
     const kind = kindInfo.kind;

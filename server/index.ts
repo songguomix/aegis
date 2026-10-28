@@ -22,6 +22,12 @@ export function createApp(): express.Express {
   loadStore();
   ensureToken();
   const app = express();
+
+  // Base64 file uploads must fit maxUploadBytes (base64 inflates by ~4/3).
+  // Only that route gets the bigger limit; everything else stays at 1mb.
+  const maxUpload = getConfig().maxUploadBytes || 32 * 1024 * 1024;
+  const uploadBodyLimit = `${Math.ceil((maxUpload * 4) / 3) + 64 * 1024}b`;
+  app.use("/api/v1/upload-scan", express.json({ limit: uploadBodyLimit }));
   app.use(express.json({ limit: "1mb" }));
 
   app.use((req, res, next) => {

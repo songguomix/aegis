@@ -101,83 +101,96 @@ export async function lookupDomainVt(
     return degraded();
   }
 
-  const now = Date.now();
-  if (now < backoffUntil) {
+  if (Date.now() < backoffUntil) {
     return degraded();
   }
-  const wait = MIN_INTERVAL_MS - (now - lastCallAt);
-  if (wait > 0) {
-    await new Promise((r) => setTimeout(r, wait));
-  }
 
-  try {
-    lastCallAt = Date.now();
-    const res = await fetch(
-      `https://www.virustotal.com/api/v3/domains/${encodeURIComponent(host)}`,
-      {
-        headers: { "x-apikey": apiKey, Accept: "application/json" },
-      },
-    );
-    if (res.status === 404) {
+  // The free tier allows ~4 lookups/min. Without the lock, two concurrent
+  // checks both pass the interval check and fire at the same instant, which
+  // burns the quota and trips the 429 backoff.
+  return withVtLock(async () => {
+    // Another queued lookup may have filled the cache while we waited.
+    const fresh = memory.get(host);
+    if (fresh && Date.now() - fresh.at < ttlMs) {
+      return { ...fresh.value, cached: true };
+    }
+    if (Date.now() < backoffUntil) {
+      return degraded();
+    }
+    const wait = MIN_INTERVAL_MS - (Date.now() - lastCallAt);
+    if (wait > 0) {
+      await new Promise((r) => setTimeout(r, wait));
+    }
+
+    try {
+      lastCallAt = Date.now();
+      const res = await fetch(
+        `https://www.virustotal.com/api/v3/domains/${encodeURIComponent(host)}`,
+        {
+          headers: { "x-apikey": apiKey, Accept: "application/json" },
+        },
+      );
+      if (res.status === 404) {
+        const value: VirusTotalReport = {
+          status: "unknown",
+          malicious: 0,
+          suspicious: 0,
+          harmless: 0,
+          undetected: 0,
+          reputation: null,
+          categories: [],
+          cached: false,
+          permalink: `https://www.virustotal.com/gui/domain/${host}`,
+        };
+        memory.set(host, { at: Date.now(), value });
+        persistDisk();
+        return value;
+      }
+      if (res.status === 429) {
+        backoffUntil = Date.now() + 60_000;
+        return degraded();
+      }
+      if (!res.ok) {
+        return { ...degraded(), status: "error" };
+      }
+      const body = (await res.json()) as {
+        data?: {
+          id?: string;
+          attributes?: {
+            last_analysis_stats?: {
+              malicious?: number;
+              suspicious?: number;
+              harmless?: number;
+              undetected?: number;
+            };
+            reputation?: number;
+            categories?: Record<string, string>;
+          };
+        };
+      };
+      const attrs = body.data?.attributes ?? {};
+      const stats = attrs.last_analysis_stats ?? {};
+      const categories = attrs.categories
+        ? Object.values(attrs.categories).slice(0, 5)
+        : [];
       const value: VirusTotalReport = {
-        status: "unknown",
-        malicious: 0,
-        suspicious: 0,
-        harmless: 0,
-        undetected: 0,
-        reputation: null,
-        categories: [],
+        status: mapStats(stats),
+        malicious: stats.malicious ?? 0,
+        suspicious: stats.suspicious ?? 0,
+        harmless: stats.harmless ?? 0,
+        undetected: stats.undetected ?? 0,
+        reputation: attrs.reputation ?? null,
+        categories,
         cached: false,
         permalink: `https://www.virustotal.com/gui/domain/${host}`,
       };
       memory.set(host, { at: Date.now(), value });
       persistDisk();
       return value;
-    }
-    if (res.status === 429) {
-      backoffUntil = Date.now() + 60_000;
+    } catch {
       return degraded();
     }
-    if (!res.ok) {
-      return { ...degraded(), status: "error" };
-    }
-    const body = (await res.json()) as {
-      data?: {
-        id?: string;
-        attributes?: {
-          last_analysis_stats?: {
-            malicious?: number;
-            suspicious?: number;
-            harmless?: number;
-            undetected?: number;
-          };
-          reputation?: number;
-          categories?: Record<string, string>;
-        };
-      };
-    };
-    const attrs = body.data?.attributes ?? {};
-    const stats = attrs.last_analysis_stats ?? {};
-    const categories = attrs.categories
-      ? Object.values(attrs.categories).slice(0, 5)
-      : [];
-    const value: VirusTotalReport = {
-      status: mapStats(stats),
-      malicious: stats.malicious ?? 0,
-      suspicious: stats.suspicious ?? 0,
-      harmless: stats.harmless ?? 0,
-      undetected: stats.undetected ?? 0,
-      reputation: attrs.reputation ?? null,
-      categories,
-      cached: false,
-      permalink: `https://www.virustotal.com/gui/domain/${host}`,
-    };
-    memory.set(host, { at: Date.now(), value });
-    persistDisk();
-    return value;
-  } catch {
-    return degraded();
-  }
+  });
 }
 
 export function clearVtCache(): void {

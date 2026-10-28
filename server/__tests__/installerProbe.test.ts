@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 import { analyzeInstallerPath } from "../services/installerProbe.js";
 
 describe("analyzeInstallerPath", () => {
@@ -41,6 +42,20 @@ describe("analyzeInstallerPath", () => {
     expect(a.kind).toContain("zip");
     expect(a.archiveMembers.some((m) => m.includes("setup.exe"))).toBe(true);
     expect(a.riskFlags).toContain("archive_executables");
+    fs.unlinkSync(p);
+  });
+
+  it("hashes files larger than the sample window (streamed, not buffered)", () => {
+    const p = path.join(os.tmpdir(), `aegis-big-${Date.now()}.bin`);
+    const payload = Buffer.alloc(9 * 1024 * 1024, 0x41); // > MAX_SAMPLE (8MB)
+    fs.writeFileSync(p, payload);
+    const expected = crypto.createHash("sha256").update(payload).digest("hex");
+    const a = analyzeInstallerPath(p);
+    expect(a.ok).toBe(true);
+    expect(a.size).toBe(payload.length);
+    expect(a.hashes.sha256).toBe(expected);
+    expect(a.hashes.sha1).toHaveLength(40);
+    expect(a.hashes.md5).toHaveLength(32);
     fs.unlinkSync(p);
   });
 });

@@ -129,7 +129,10 @@ export async function scanDownloadedFile(
       reasons: [
         {
           code: outcome.error,
-          severity: outcome.error === "vt_key_required" ? "warn" : "warn",
+          severity:
+            outcome.error === "vt_key_required" || outcome.error === "upload_failed"
+              ? "warn"
+              : "critical",
           message: outcome.message ?? outcome.error,
         },
       ],
@@ -160,8 +163,10 @@ export async function scanDownloadedFile(
       path: resolved,
       sha256: sha,
       size,
-      uploaded: result.reasons.some((r) => r.code === "vt_uploaded") || Boolean(result.virusTotal.permalink),
-      analysisId: result.reasons.find((r) => r.code === "vt_uploaded")?.message ?? null,
+      // `uploaded`/`analysisId` live on the result itself; the reason codes
+      // are informational only ("vt_uploaded_scan" / "vt_known_file").
+      uploaded: Boolean(result.uploaded),
+      analysisId: result.analysisId ?? null,
       maxUploadBytes: limit,
       vtApiKeyConfigured: key,
     },

@@ -182,6 +182,52 @@ export interface ReviewItem {
   note?: string;
 }
 
+export interface InstallerAnalysis {
+  ok: boolean;
+  error?: string;
+  path: string;
+  fileName: string;
+  size: number;
+  hashes: { sha256: string; sha1: string; md5: string };
+  kind: string;
+  mimeGuess: string;
+  entropy: number;
+  urls: string[];
+  ips: string[];
+  suspiciousStrings: string[];
+  archiveMembers: string[];
+  riskFlags: string[];
+  aiBrief: string;
+  checkedAt: string;
+}
+
+export interface SandboxRunResult {
+  ok: boolean;
+  degraded: boolean;
+  isolated: boolean;
+  warning?: string;
+  reason?: string;
+  mode: "seatbelt" | "bwrap" | "restricted";
+  platform: string;
+  sandboxRoot: string;
+  argv: string[];
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  durationMs: number;
+  error?: string;
+}
+
+export interface SandboxExtractResult {
+  ok: boolean;
+  error?: string;
+  memberCount: number;
+  extractedBytes: number;
+  targetDir: string;
+  members: string[];
+}
+
 export interface Health {
   ok: boolean;
   service: string;
@@ -331,4 +377,27 @@ export const api = {
         : "http://127.0.0.1:7832/api/v1";
     return `${base}/mcp-deploy/bundle.zip`;
   },
+  uploadScan: (data: { filename?: string; base64?: string; path?: string; context?: string }) =>
+    request<GateResult>("/upload-scan", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  analyzeInstaller: (path: string, context?: string) =>
+    request<InstallerAnalysis>("/analyze-installer", {
+      method: "POST",
+      body: JSON.stringify({ path, context }),
+    }),
+  sandboxRun: (
+    argv: string[],
+    opts?: { timeoutMs?: number; target?: string; cleanup?: boolean; allowUnisolated?: boolean },
+  ) =>
+    request<SandboxRunResult>("/sandbox/run", {
+      method: "POST",
+      body: JSON.stringify({ argv, ...opts }),
+    }),
+  sandboxExtract: (path: string, timeoutMs?: number) =>
+    request<SandboxExtractResult>("/sandbox/extract", {
+      method: "POST",
+      body: JSON.stringify({ path, timeoutMs }),
+    }),
 };

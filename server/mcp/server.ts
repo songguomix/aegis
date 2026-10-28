@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { runGate } from "../services/gate.js";
 import { runFileGate } from "../services/fileGate.js";
@@ -7,14 +8,10 @@ import { scanDownloadedFile } from "../services/fileUploadScan.js";
 import { analyzeInstallerPath } from "../services/installerProbe.js";
 import { runInSandbox, extractInSandbox, cleanupSandbox } from "../services/sandbox.js";
 import { runUploadScan } from "../services/uploadScan.js";
-import { getConfig, appendHistory, stats, updateConfig } from "../services/store.js";
+import { getConfig, appendHistory, stats } from "../services/store.js";
 import { lookupOfficial } from "../services/registry.js";
-import {
-  getReview,
-  listReviews,
-  resolveReview,
-  reviewStats,
-} from "../services/reviewQueue.js";
+import { listReviews, reviewStats } from "../services/reviewQueue.js";
+import { resolveReviewDecision } from "../services/reviewDecision.js";
 import {
   clearTrust,
   isTrusted,
@@ -256,17 +253,42 @@ export function createMcpServer(): McpServer {
     {
       title: "Run command in strict sandbox (no network)",
       description:
-        "Run an argv command in a hardened sandbox (macOS Seatbelt when available): deny network, write only sandbox temp, filter secrets from env. Use for static inspection of unpacked installers (file, ls, strings). Do NOT use to install or execute untrusted payloads on the real user system.",
+        "Run an argv command inside an OS-level sandbox: macOS Seatbelt or Linux bubblewrap deny network, allow writes only inside the sandbox temp dir and block ~/.ssh, ~/.aws and keychains. Pass `target` with the absolute path of the artifact to inspect — Aegis copies it into the sandbox and rewrites the argument, so a trusted tool (file, strings, ls, shasum, codesign …) can read it. On platforms without kernel isolation (Windows, or Linux without bwrap) the call is REFUSED with error=no_os_sandbox and a list of non-executing alternatives; `allowUnisolated: true` overrides this but only for the trusted read-only allowlist, with every path argument forced to stay inside the sandbox.",
       inputSchema: {
         argv: z.array(z.string()).min(1).max(32),
         timeoutMs: z.number().int().min(500).max(60000).optional(),
+        target: z
+          .string()
+          .optional()
+          .describe("Absolute path of the artifact to inspect (copied into the sandbox)"),
+        allowUnisolated: z
+          .boolean()
+          .optional()
+          .describe(
+            "Opt in to running a trusted read-only inspection tool even without kernel isolation",
+          ),
       },
     },
-    async ({ argv, timeoutMs }) => {
-      const result = await runInSandbox(argv, { timeoutMs });
+    async ({ argv, timeoutMs, target, allowUnisolated }) => {
+      const result = await runInSandbox(argv, {
+        timeoutMs,
+        targetPath: target,
+        allowUnisolated,
+      });
       cleanupSandbox(result.sandboxRoot);
+      const payload = result.ok
+        ? result
+        : {
+            ...result,
+            // Hand the reason to the model verbatim so it can pick another route.
+            message:
+              result.reason ??
+              result.warning ??
+              result.error ??
+              "sandbox run failed",
+          };
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
         isError: !result.ok,
       };
     },
@@ -551,38 +573,31 @@ export function createMcpServer(): McpServer {
       },
     },
     async ({ id, decision, note, alwaysAllow }) => {
-      const existing = getReview(id);
-      if (!existing) {
-        return {
-          content: [{ type: "text", text: JSON.stringify({ error: "not_found", id }) }],
-        };
-      }
-      const { item, changed } = resolveReview(id, decision, { by: "agent", note });
-      if (!changed) {
+      const outcome = resolveReviewDecision(id, decision, {
+        by: "agent",
+        note,
+        alwaysAllow,
+        // Same behaviour as POST /reviews/:id/resolve: an allowed host becomes
+        // session-trusted, otherwise the agent loops on the same "review".
+        sessionTrust: true,
+      });
+      if (!outcome.ok) {
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ error: "not_pending", review: item }),
+              text: JSON.stringify(
+                outcome.error === "not_found"
+                  ? { error: "not_found", id }
+                  : { error: "not_pending", review: outcome.item },
+              ),
             },
           ],
           isError: true,
         };
       }
-      if (alwaysAllow && existing.hostname && isValidHostname(existing.hostname)) {
-        const cfg = getConfig();
-        const list = decision === "allow" ? cfg.allowlist : cfg.denylist;
-        if (!list.includes(existing.hostname)) {
-          updateConfig({
-            [decision === "allow" ? "allowlist" : "denylist"]: [
-              ...list,
-              existing.hostname,
-            ],
-          });
-        }
-      }
       return {
-        content: [{ type: "text", text: JSON.stringify(item, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(outcome.item, null, 2) }],
       };
     },
   );
@@ -597,8 +612,10 @@ export async function startMcpStdio(): Promise<void> {
   console.error("[aegis] MCP stdio server ready");
 }
 
-// Allow `tsx server/mcp/server.ts` as standalone MCP entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Allow `tsx server/mcp/server.ts` as standalone MCP entry.
+// pathToFileURL keeps this working on Windows (drive letters) and for paths
+// that contain spaces — a raw `file://${argv[1]}` comparison does not.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   startMcpStdio().catch((err) => {
     console.error(err);
     process.exit(1);

@@ -102,7 +102,9 @@ export function updateConfig(patch: Partial<EngineConfig>): EngineConfig {
     /* ignore */
   }
   config = { ...config, ...patch };
-  if ("customBrands" in patch) setCustomBrands(config.customBrands);
+  // Always resync: the disk merge above may have brought in a different
+  // customBrands list than the one currently in the registry.
+  setCustomBrands(config.customBrands);
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), {
     encoding: "utf8",
     mode: 0o600,

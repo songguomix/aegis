@@ -497,6 +497,7 @@
         const btnBlock = document.getElementById("btn-block");
 
         let lastId = null;
+        let baselineTaken = false;
         let hideTimer = null;
         let queue = [];
         let live = false;
@@ -556,11 +557,35 @@
           }
         }
 
+        /**
+         * Run fn on the next frame — with a timer fallback.
+         * requestAnimationFrame does not fire while the window is hidden or
+         * occluded, which would leave the bar collapsed and the hostname
+         * invisible (the slot only expands via the has-domain/has-review class).
+         */
+        function nextFrame(fn) {
+          let done = false;
+          const run = () => {
+            if (done) return;
+            done = true;
+            fn();
+          };
+          requestAnimationFrame(run);
+          setTimeout(run, 60);
+        }
+
         function showItem(item) {
           live = true;
           const decision = item.decision;
           const hostname = item.hostname || item.url;
-          activeReviewId = decision === "review" ? item.reviewId || item.id || null : null;
+          const needsReview = decision === "review" && item.needsReview;
+          activeReviewId = needsReview ? item.reviewId || item.id || null : null;
+
+          // The approve buttons are disabled while a request is in flight and
+          // are never re-enabled afterwards — without this reset every review
+          // after the first one shows dead buttons.
+          btnAllow.disabled = !needsReview;
+          btnBlock.disabled = !needsReview;
 
           setLight(decision);
           tag.className = "tag " + decision;
@@ -574,8 +599,8 @@
 
           bar.classList.remove("has-domain", "has-review");
           void bar.getBoundingClientRect();
-          requestAnimationFrame(() => {
-            if (decision === "review" && item.needsReview) {
+          nextFrame(() => {
+            if (needsReview) {
               bar.classList.add("has-review");
             } else {
               bar.classList.add("has-domain");
@@ -590,7 +615,7 @@
           flash(decision);
 
           clearTimeout(hideTimer);
-          const ms = item.needsReview ? REVIEW_MS : LIVE_MS;
+          const ms = needsReview ? REVIEW_MS : LIVE_MS;
           hideTimer = setTimeout(() => {
             hideSlot();
             const next = queue.shift();
@@ -695,6 +720,21 @@
             } catch { /* ignore */ }
             syncSoundFromServer(health?.soundEnabled !== false);
 
+            const items = hist?.items ?? [];
+            const newest = items[0];
+            if (!baselineTaken) {
+              // Baseline: remember what already existed when the float came up
+              // so old history is not replayed. Taken on the first successful
+              // poll even when the history is empty — otherwise the first
+              // check after startup would be swallowed as "old".
+              baselineTaken = true;
+              lastId = newest ? newest.id : null;
+              if (newest) {
+                setLight(newest.decision);
+                setCompact(true);
+              }
+            }
+
             // Pending reviews take priority on the float (human or AI can act)
             const pending = rev?.items ?? [];
             const p = pending[0];
@@ -713,22 +753,14 @@
               return;
             }
 
-            const items = hist?.items ?? [];
-            const newest = items[0];
             if (newest && newest.id !== lastId) {
-              if (lastId === null) {
-                lastId = newest.id;
-                setLight(newest.decision);
-                setCompact(true);
-              } else {
-                lastId = newest.id;
-                pushItem({
-                  decision: newest.decision,
-                  needsReview: false,
-                  hostname: newest.hostname || newest.url,
-                  id: newest.id,
-                });
-              }
+              lastId = newest.id;
+              pushItem({
+                decision: newest.decision,
+                needsReview: false,
+                hostname: newest.hostname || newest.url,
+                id: newest.id,
+              });
             }
           } catch {
             /* ignore */

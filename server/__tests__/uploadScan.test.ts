@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { DEFAULT_CONFIG } from "../types.js";
 
 const uploadFileVt = vi.fn();
@@ -91,5 +94,53 @@ describe("upload_scan", () => {
     });
     const r = await runUploadScan({ base64: Buffer.from("ok").toString("base64") }, cfg);
     expect(r.ok && r.result.decision).toBe("allow");
+  });
+
+  it("rejects an oversized file on disk before reading it into memory", async () => {
+    const p = path.join(os.tmpdir(), `aegis-upload-big-${Date.now()}.bin`);
+    fs.writeFileSync(p, Buffer.alloc(4096, 1));
+    const r = await runUploadScan({ path: p }, cfg);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toBe("file_too_large");
+      expect(r.maxBytes).toBe(1024);
+    }
+    expect(uploadFileVt).not.toHaveBeenCalled();
+    fs.unlinkSync(p);
+  });
+
+  it("rejects malformed base64 instead of scanning garbage", async () => {
+    const r = await runUploadScan({ base64: "not base64 @@@" }, cfg);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("invalid_base64");
+    expect(uploadFileVt).not.toHaveBeenCalled();
+  });
+
+  it("scans a file on disk that fits the limit", async () => {
+    uploadFileVt.mockResolvedValue({
+      ok: true,
+      value: {
+        analysisId: "x",
+        sha256: "bb",
+        uploaded: true,
+        report: {
+          status: "clean",
+          malicious: 0,
+          suspicious: 0,
+          harmless: 5,
+          undetected: 0,
+          reputation: 0,
+          categories: [],
+          cached: false,
+          permalink: null,
+        },
+      },
+    });
+    const p = path.join(os.tmpdir(), `aegis-upload-ok-${Date.now()}.bin`);
+    fs.writeFileSync(p, Buffer.alloc(128, 2));
+    const r = await runUploadScan({ path: p }, cfg);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.result.fileName).toBe(path.basename(p));
+    fs.unlinkSync(p);
   });
 });

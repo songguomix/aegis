@@ -40,8 +40,10 @@ Aegis 主要在 macOS 验证；沙箱依赖 `sandbox-exec`，打包仅 mac。需
 
 - `detectSandboxBackend()`: `seatbelt` | `bwrap` | `restricted`
 - Linux `bwrap`: `--unshare-net --unshare-all --die-with-parent --ro-bind /usr /usr --bind sandboxRoot sandboxRoot …`
-- Windows/`restricted`: 清理环境变量、cwd=沙箱目录、argv spawn；**degraded=true** 并在结果中说明
-- `runInSandbox` / `extractInSandbox` 返回 `mode` 与 `platform`
+- Windows/`restricted`: **拒绝执行**（`error=no_os_sandbox`），并把「拒绝原因 + 不执行任何东西的替代路径（`analyze_installer` / `extract_in_sandbox` / `check_file_hash` / 请用户人工检查）」写进 `reason` 交给模型自行决策；显式 `allowUnisolated: true` 时只放行受信任的只读检查工具白名单（且路径必须留在沙箱内）；`degraded=true`、`isolated=false`
+- `runInSandbox` / `extractInSandbox` 返回 `mode`、`platform`、`isolated`、`degraded`（`runInSandbox` 另返回 `reason`）
+- **目标文件暂存**：`run_in_sandbox` 的 `target` 参数由 Aegis 拷进沙箱根并改写 argv——沙箱按设计读不到工作目录，取证必须走副本
+- **zip 解压用 Node 实现**（`server/services/zipExtract.ts`：解析中央目录 → store/deflate → 仅写沙箱根，拒绝路径穿越与符号链接，限制条目数与总解压体积），因此 Windows 与未装 `unzip` 的 Linux 均可解压；系统 `unzip` 仅在「无法解析的 zip」时于**沙箱内**兜底
 
 ### Electron
 

@@ -63,30 +63,54 @@ export async function runUploadScan(
     return { ok: false, error: "invalid_input", message: "Provide path or base64" };
   }
 
+  const maxBytes = config.maxUploadBytes || 32 * 1024 * 1024;
+
   let data: Buffer;
   let fileName = input.filename?.trim() || null;
 
   if (input.path) {
     const abs = path.resolve(input.path);
-    if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+    let st: fs.Stats;
+    try {
+      st = fs.statSync(abs);
+    } catch {
       return { ok: false, error: "path_not_found" };
+    }
+    if (!st.isFile()) {
+      return { ok: false, error: "path_not_found" };
+    }
+    // Check the size *before* reading: a multi-GB file must never be pulled
+    // into memory just to be rejected afterwards.
+    if (st.size > maxBytes) {
+      return { ok: false, error: "file_too_large", maxBytes };
     }
     data = fs.readFileSync(abs);
     fileName = fileName || path.basename(abs);
   } else {
+    const b64 = input.base64 ?? "";
+    // base64 inflates the payload by ~4/3 — reject oversized bodies up front
+    // instead of allocating the decoded buffer first.
+    if (Math.ceil((b64.length * 3) / 4) > maxBytes) {
+      return { ok: false, error: "file_too_large", maxBytes };
+    }
+    const compact = b64.replace(/\s+/g, "");
+    // Accept standard and URL-safe base64; reject anything else up front
+    // (Buffer.from silently drops invalid characters).
+    if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(compact)) {
+      return { ok: false, error: "invalid_base64" };
+    }
     try {
-      data = Buffer.from(input.base64 ?? "", "base64");
+      data = Buffer.from(compact, "base64");
     } catch {
       return { ok: false, error: "invalid_base64" };
     }
-    if (!data.length && (input.base64 ?? "").length > 0) {
+    if (!data.length && compact.length > 0) {
       return { ok: false, error: "invalid_base64" };
     }
   }
 
   if (!data.length) return { ok: false, error: "empty_file" };
 
-  const maxBytes = config.maxUploadBytes || 32 * 1024 * 1024;
   if (data.length > maxBytes) {
     return { ok: false, error: "file_too_large", maxBytes };
   }

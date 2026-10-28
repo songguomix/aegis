@@ -26,9 +26,9 @@ import { intelFeedStatus } from "../services/threatIntel.js";
 import {
   getReview,
   listReviews,
-  resolveReview,
   reviewStats,
 } from "../services/reviewQueue.js";
+import { resolveReviewDecision } from "../services/reviewDecision.js";
 import {
   clearTrust,
   listTrust,
@@ -123,46 +123,21 @@ export function createApiRouter(): express.Router {
       res.status(400).json({ error: "invalid_request" });
       return;
     }
-    const existing = getReview(req.params.id);
-    if (!existing) {
-      res.status(404).json({ error: "not_found" });
-      return;
-    }
-    const { item, changed } = resolveReview(req.params.id, parsed.data.decision, {
+    const outcome = resolveReviewDecision(req.params.id, parsed.data.decision, {
       by: parsed.data.by ?? "user",
       note: parsed.data.note,
+      alwaysAllow: parsed.data.alwaysAllow,
+      sessionTrust: parsed.data.sessionTrust,
     });
-    if (!changed) {
-      res.status(409).json({ error: "not_pending", review: item });
+    if (!outcome.ok) {
+      if (outcome.error === "not_found") {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.status(409).json({ error: "not_pending", review: outcome.item });
       return;
     }
-    if (parsed.data.decision === "allow" && parsed.data.alwaysAllow) {
-      const cfg = getConfig();
-      if (
-        !cfg.allowlist.includes(existing.hostname) &&
-        isValidHostname(existing.hostname)
-      ) {
-        updateConfig({ allowlist: [...cfg.allowlist, existing.hostname] });
-      }
-    }
-    if (parsed.data.decision === "block" && parsed.data.alwaysAllow) {
-      const cfg = getConfig();
-      if (
-        !cfg.denylist.includes(existing.hostname) &&
-        isValidHostname(existing.hostname)
-      ) {
-        updateConfig({ denylist: [...cfg.denylist, existing.hostname] });
-      }
-    }
-    if (parsed.data.decision === "allow" && parsed.data.sessionTrust !== false) {
-      if (isValidHostname(existing.hostname)) {
-        trustDomain(existing.hostname, {
-          source: (parsed.data.by ?? "user") as "user" | "agent",
-          reason: `review ${existing.id}`,
-        });
-      }
-    }
-    res.json(item);
+    res.json(outcome.item);
   });
 
   router.get("/integration", (_req, res) => {
@@ -259,6 +234,27 @@ export function createApiRouter(): express.Router {
           name: "get_gate_status",
           description: "Engine health, policy, VT mode, counts, session trust size.",
           input: [],
+        },
+        {
+          name: "export_mcp_bundle",
+          description: "Deploy files (mcp JSON, SKILL, README, install.sh) for Claude/Cursor.",
+          input: [],
+        },
+        {
+          name: "run_in_sandbox",
+          description:
+            "Run argv in the strictest available sandbox (seatbelt/bwrap). isolated=false on platforms without kernel isolation. Use target= to inspect an artifact.",
+          input: ["argv: string[]", "target?: string", "timeoutMs?: number", "allowUnisolated?: boolean"],
+        },
+        {
+          name: "extract_in_sandbox",
+          description: "Extract zip into the sandbox (traversal-safe, Node-based).",
+          input: ["path: string"],
+        },
+        {
+          name: "analyze_installer",
+          description: "Static analysis of a local installer/package — no execution.",
+          input: ["path: string"],
         },
       ],
       http: {
@@ -451,6 +447,8 @@ export function createApiRouter(): express.Router {
         argv: z.array(z.string().min(1)).min(1).max(32),
         timeoutMs: z.number().int().min(500).max(60000).optional(),
         cleanup: z.boolean().optional(),
+        target: z.string().min(1).optional(),
+        allowUnisolated: z.boolean().optional(),
       })
       .safeParse(req.body);
     if (!parsed.success) {
@@ -459,9 +457,16 @@ export function createApiRouter(): express.Router {
     }
     const result = await runInSandbox(parsed.data.argv, {
       timeoutMs: parsed.data.timeoutMs,
+      targetPath: parsed.data.target,
+      allowUnisolated: parsed.data.allowUnisolated,
     });
     if (parsed.data.cleanup !== false) {
       cleanupSandbox(result.sandboxRoot);
+    }
+    if (!result.ok) {
+      // 501: the platform cannot provide an OS-level sandbox at all.
+      res.status(result.error === "no_os_sandbox" ? 501 : 500).json(result);
+      return;
     }
     res.json(result);
   });
